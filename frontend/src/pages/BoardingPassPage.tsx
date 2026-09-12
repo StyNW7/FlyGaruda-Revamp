@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AlertTriangle, ArrowRight, Footprints, Luggage, Navigation, Radar, Share2, Wallet, FlaskConical } from 'lucide-react'
+import { AlertTriangle, ArrowRight, CalendarPlus, Check, Footprints, Luggage, Navigation, Radar, Share2, Wallet, FlaskConical } from 'lucide-react'
 import { AppHeader } from '../components/common/AppHeader'
 import { PageContainer } from '../components/common/Layout'
 import { Button } from '../components/common/Button'
@@ -8,10 +8,13 @@ import { BottomSheet } from '../components/common/Overlays'
 import { EmptyState } from '../components/common/States'
 import { StatusBadge } from '../components/common/StatusBadge'
 import { BarcodeVisual, QrVisual } from '../components/trips/Codes'
+import { ShareImageSheet } from '../components/common/ShareImageSheet'
 import { useToast } from '../components/common/Toast'
 import { useApp } from '../store/AppContext'
 import { cityOf } from '../data/airports'
 import { addMinutes, formatMediumDate } from '../utils/format'
+import { renderBoardingPassStory } from '../utils/storyCard'
+import { downloadTripICS } from '../utils/ics'
 import { cn } from '../utils/cn'
 
 function Field({ label, value, big, className }: { label: string; value: string; big?: boolean; className?: string }) {
@@ -30,6 +33,7 @@ export function BoardingPassPage() {
   const { getTrip, dispatch } = useApp()
   const trip = getTrip(id)
   const [directions, setDirections] = useState(false)
+  const [share, setShare] = useState<'share' | 'wallet' | null>(null)
 
   if (!trip) {
     return (
@@ -86,7 +90,7 @@ export function BoardingPassPage() {
   return (
     <div className="flex-1 flex flex-col bg-surface-off">
       <AppHeader back={`/trips/${trip.id}`} title="Boarding pass" right={
-        <button type="button" onClick={() => toast('Boarding pass shared')} aria-label="Share boarding pass" className="h-10 w-10 rounded-full hover:bg-surface-soft flex items-center justify-center text-brand-navy">
+        <button type="button" onClick={() => setShare('share')} aria-label="Share boarding pass" className="h-10 w-10 rounded-full hover:bg-surface-soft flex items-center justify-center text-brand-navy">
           <Share2 className="h-5 w-5" />
         </button>
       } />
@@ -208,12 +212,15 @@ export function BoardingPassPage() {
           </div>
         </section>
 
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant="secondary" leftIcon={<Wallet className="h-4 w-4" />} onClick={() => toast('Added to your wallet')}>
-            Add to Wallet
+        <div className="grid grid-cols-3 gap-2">
+          <Button variant="secondary" size="sm" className="px-2" leftIcon={trip.walletSaved ? <Check className="h-4 w-4 text-success" /> : <Wallet className="h-4 w-4" />} onClick={() => setShare('wallet')}>
+            {trip.walletSaved ? 'In Wallet' : 'Wallet'}
           </Button>
-          <Button variant="secondary" leftIcon={<Navigation className="h-4 w-4" />} onClick={() => setDirections(true)}>
-            Gate directions
+          <Button variant="secondary" size="sm" className="px-2" leftIcon={<CalendarPlus className="h-4 w-4" />} onClick={() => { downloadTripICS(trip); toast('Calendar event downloaded (.ics)') }}>
+            Calendar
+          </Button>
+          <Button variant="secondary" size="sm" className="px-2" leftIcon={<Navigation className="h-4 w-4" />} onClick={() => setDirections(true)}>
+            Directions
           </Button>
         </div>
 
@@ -227,6 +234,21 @@ export function BoardingPassPage() {
           </button>
         )}
       </PageContainer>
+
+      <ShareImageSheet
+        open={share !== null}
+        onClose={() => setShare(null)}
+        title={share === 'wallet' ? 'Save to Wallet' : 'Share boarding pass'}
+        subtitle={share === 'wallet' ? 'Saves an offline copy of your pass to your photos / wallet' : `${trip.flightNumber} · ${trip.origin} → ${trip.destination} · Seat ${trip.seat}`}
+        filename={`boarding-pass-${trip.flightNumber.replace(' ', '')}-${trip.bookingCode}.png`}
+        shareTitle={`Boarding pass ${trip.flightNumber}`}
+        shareText={`${trip.flightNumber} ${trip.origin} → ${trip.destination} · ${formatMediumDate(trip.date)} · Boarding ${boarding} · Gate ${trip.gate} · Seat ${trip.seat}`}
+        render={() => renderBoardingPassStory(trip, trip.passengerName)}
+        deps={[trip.gate, trip.seat, boarding, trip.status]}
+        onSaved={() => {
+          if (!trip.walletSaved) dispatch({ type: 'UPDATE_TRIP', id: trip.id, patch: { walletSaved: true } })
+        }}
+      />
 
       <BottomSheet open={directions} onClose={() => setDirections(false)} title={`Directions to Gate ${trip.gate}`} subtitle={`${trip.terminal} · about 8 minutes on foot`}>
         <ol className="space-y-3 pb-2">

@@ -5,16 +5,22 @@ import {
   Armchair,
   ArrowRight,
   Award,
+  CalendarPlus,
   ClipboardList,
   Clock,
   Copy,
   Headphones,
+  Leaf,
   Luggage,
   MessageCircle,
   Plane,
   QrCode,
   Radar,
   Route,
+  Share2,
+  ShieldCheck,
+  Sofa,
+  Sparkles,
   TicketCheck,
   User,
   UtensilsCrossed,
@@ -36,14 +42,25 @@ import { useSimulatedLoading } from '../hooks/useSimulatedLoading'
 import { nextActionFor, STAGES } from '../data/trips'
 import { FARE_FAMILIES } from '../data/flights'
 import { cityOf, getAirport } from '../data/airports'
-import { daysLabel, daysUntil, formatLongDate, formatNumber } from '../utils/format'
+import { daysLabel, daysUntil, formatLongDate, formatNumber, formatRupiah } from '../utils/format'
 import { DestinationInfoCard } from '../components/journey/DestinationCard'
+import { downloadTripICS, itineraryText } from '../utils/ics'
+import { shareText } from '../utils/share'
+
+const EXTRA_LABELS: Record<string, { label: string; icon: typeof Luggage }> = {
+  baggage10: { label: 'Extra baggage +10 kg', icon: Luggage },
+  priority: { label: 'Priority boarding', icon: Sparkles },
+  insurance: { label: 'Travel protection', icon: ShieldCheck },
+  lounge: { label: 'Lounge access · Terminal 3', icon: Sofa },
+  'preferred-seat': { label: 'Preferred seat voucher', icon: Armchair },
+  wifi: { label: 'In-flight Wi-Fi pass', icon: Sparkles },
+}
 
 export function TripDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
-  const { getTrip, isMember } = useApp()
+  const { getTrip, isMember, miles } = useApp()
   const online = useOnline()
   const trip = getTrip(id)
   const loading = useSimulatedLoading(500, [id])
@@ -236,7 +253,7 @@ export function TripDetailPage() {
             <User className="h-5 w-5 text-brand-navy" />
             <p className="t-label mt-3">Passenger</p>
             <p className="text-[14px] font-semibold text-ink mt-1">{trip.passengerName}</p>
-            <p className="text-[11.5px] text-ink-muted">GarudaMiles Silver</p>
+            <p className="text-[11.5px] text-ink-muted">GarudaMiles {miles.tier.name}{trip.passengerCount && trip.passengerCount > 1 ? ` · ${trip.passengerCount} travellers` : ''}</p>
           </section>
           <section className="card p-4">
             <Luggage className="h-5 w-5 text-brand-navy" />
@@ -258,7 +275,61 @@ export function TripDetailPage() {
           </section>
         </div>
 
+        {((trip.addOns && trip.addOns.length > 0) || trip.carbonOffset || trip.upgradeBid) && (
+          <section className="card">
+            <div className="px-4 pt-4 pb-2 flex items-center gap-2 text-[14px] font-bold text-ink">
+              <Sparkles className="h-4 w-4 text-brand-gold" /> Extras on this booking
+            </div>
+            <ul className="px-4 pb-3 divide-y divide-surface-line">
+              {(trip.addOns ?? []).map((a) => {
+                const meta = EXTRA_LABELS[a] ?? { label: a, icon: Sparkles }
+                return (
+                  <li key={a} className="py-2.5 flex items-center gap-3 text-[13px]">
+                    <meta.icon className="h-4 w-4 text-brand-turquoise" />
+                    <span className="flex-1 text-ink">{meta.label}</span>
+                    <span className="text-[11px] font-semibold text-success">Confirmed</span>
+                  </li>
+                )
+              })}
+              {trip.carbonOffset && (
+                <li className="py-2.5 flex items-center gap-3 text-[13px]">
+                  <Leaf className="h-4 w-4 text-success" />
+                  <span className="flex-1 text-ink">Carbon offset · verified project</span>
+                  <span className="text-[11px] font-semibold text-success">Offset</span>
+                </li>
+              )}
+              {trip.upgradeBid && (
+                <li className="py-2.5 flex items-center gap-3 text-[13px]">
+                  <Award className="h-4 w-4 text-brand-gold" />
+                  <span className="flex-1 text-ink">BidUpgrade · {formatRupiah(trip.upgradeBid)}</span>
+                  <span className="text-[11px] font-semibold text-warning">Pending · 48h before</span>
+                </li>
+              )}
+            </ul>
+          </section>
+        )}
+
         {!isPast && <DestinationInfoCard trip={trip} compact />}
+
+        {!isPast && trip.status !== 'cancelled' && (
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="secondary" leftIcon={<CalendarPlus className="h-4 w-4" />} onClick={() => { downloadTripICS(trip); toast('Calendar event downloaded (.ics)') }}>
+              Add to Calendar
+            </Button>
+            <Button
+              variant="secondary"
+              leftIcon={<Share2 className="h-4 w-4" />}
+              onClick={async () => {
+                const r = await shareText({ title: `${trip.flightNumber} · ${trip.origin} → ${trip.destination}`, text: itineraryText(trip) })
+                if (r === 'shared') toast('Itinerary shared')
+                else if (r === 'copied') toast('Itinerary copied to clipboard')
+                else if (r === 'failed') toast('Could not share on this device', 'warning')
+              }}
+            >
+              Share Itinerary
+            </Button>
+          </div>
+        )}
 
         {!isPast && (
           <MascotBanner

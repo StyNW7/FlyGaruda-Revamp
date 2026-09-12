@@ -9,10 +9,12 @@ import { BottomSheet, Modal } from '../components/common/Overlays'
 import { SeatLegend, SeatMap } from '../components/booking/SeatMap'
 import { seatType } from '../utils/seats'
 import { ADD_ONS, FARE_FAMILIES, findFlight } from '../data/flights'
-import { PAYMENT_METHODS, SAVED_PASSENGERS } from '../data/user'
+import { MILES_TO_IDR, PROMO_CODES } from '../data/miles'
 import { getAirport } from '../data/airports'
 import { useApp } from '../store/AppContext'
-import { addMinutes, formatMediumDate, formatRupiah, generateBookingCode } from '../utils/format'
+import { addMinutes, formatMediumDate, formatNumber, formatRupiah, generateBookingCode } from '../utils/format'
+import { distanceKm } from '../utils/geo'
+import { todayISO } from '../utils/share'
 import type { DraftPassenger, Flight, Trip } from '../types'
 import { cn } from '../utils/cn'
 
@@ -38,19 +40,22 @@ function StepHeader({ step }: { step: number }) {
   )
 }
 
-const PAY_ICONS = { card: CreditCard, transfer: Landmark, qris: QrCode, wallet: Wallet, miles: Award }
+const PAY_ICONS = { card: CreditCard, transfer: Landmark, qris: QrCode, wallet: Wallet, miles: Award } as const
 const TYPE_LABEL = { adult: 'Adult', child: 'Child', infant: 'Infant' }
 
 export function CheckoutPage() {
-  const { state, dispatch, isMember } = useApp()
+  const { state, dispatch, isMember, miles } = useApp()
   const navigate = useNavigate()
   const draft = state.draft
+  const SAVED_PASSENGERS = state.savedPassengers
+  const PAYMENT_METHODS = state.paymentMethods
   const legs = useMemo(() => (draft ? draft.legIds.map(findFlight).filter((f): f is Flight => Boolean(f)) : []), [draft])
   const [step, setStep] = useState(0)
   const [seatSheet, setSeatSheet] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [agree, setAgree] = useState(false)
   const [contactOpen, setContactOpen] = useState(!isMember)
+  const [milesToUse, setMilesToUse] = useState(2000)
   const completedRef = useRef(false)
 
   useEffect(() => {
@@ -64,14 +69,23 @@ export function CheckoutPage() {
   const farePerPax = legs.reduce((sum, f) => sum + f.prices[draft.fareId], 0)
   const farePrice = farePerPax * paying
   const addOnTotal = draft.addOns.reduce((sum, id) => sum + (ADD_ONS.find((a) => a.id === id)?.price ?? 0), 0)
-  const taxes = Math.round((farePrice * 0.11) / 1000) * 1000
-  const total = farePrice + addOnTotal + taxes
+  const promoCode = state.search.promoCode?.trim().toUpperCase()
+  const promo = promoCode ? PROMO_CODES[promoCode] : undefined
+  const promoDiscount = promo ? Math.min(promo.maxDiscount, Math.round((farePrice * promo.percent) / 100 / 1000) * 1000) : 0
+  const payingWithMiles = isMember && draft.paymentMethod === 'miles'
+  const maxMiles = isMember ? Math.min(miles.balance, Math.floor((farePrice - promoDiscount) * 0.5 / MILES_TO_IDR / 500) * 500) : 0
+  const milesDiscount = payingWithMiles ? Math.min(milesToUse, maxMiles) * MILES_TO_IDR : 0
+  const discountedFare = farePrice - promoDiscount - milesDiscount
+  const taxes = Math.round((discountedFare * 0.11) / 1000) * 1000
+  const total = discountedFare + addOnTotal + taxes
   const passengersValid = draft.passengers.every((p) => p.firstName.trim() && p.lastName.trim()) && draft.contact.email.trim() && draft.contact.phone.trim()
   const lead = draft.passengers[0]
 
   const update = (patch: Partial<typeof draft>) => dispatch({ type: 'UPDATE_DRAFT', patch })
   const updatePassenger = (id: string, patch: Partial<DraftPassenger>) => update({ passengers: draft.passengers.map((p) => (p.id === id ? { ...p, ...patch } : p)) })
   const toggleAddOn = (id: string) => update({ addOns: draft.addOns.includes(id) ? draft.addOns.filter((a) => a !== id) : [...draft.addOns, id] })
+
+  const legLabel = legs.length > 1 ? `${legs[0].number} + ${legs[1].number}` : legs[0].number
 
   const pay = () => {
     setProcessing(true)
@@ -121,6 +135,7 @@ export function CheckoutPage() {
           milesEstimate: Math.round(flight.milesEarn * (draft.fareId === 'flex' ? 1.5 : draft.fareId === 'value' ? 1.25 : 1)),
           addOns: draft.addOns,
           totalPaid: index === 0 ? total : undefined,
+          distanceKm: distanceKm(flight.origin, flight.destination),
         }
         created.push(trip)
         firstId = firstId ?? id
@@ -129,6 +144,13 @@ export function CheckoutPage() {
       navigate(`/confirmation/${firstId}`, { replace: true })
       created.forEach((trip) => dispatch({ type: 'ADD_TRIP', trip }))
       dispatch({ type: 'SET_DRAFT', draft: null })
+      if (milesDiscount > 0) {
+        dispatch({ type: 'SPEND_MILES', entry: { date: todayISO(), title: 'Cash + Miles payment', subtitle: `${legLabel} · ${formatRupiah(milesDiscount)} off`, miles: milesDiscount / MILES_TO_IDR, type: 'redeem' } })
+      }
+      if (promo?.bonusMiles && isMember) {
+        dispatch({ type: 'EARN_MILES', entry: { date: todayISO(), title: `Promo bonus · ${promoCode}`, subtitle: 'Bonus miles for this booking', miles: promo.bonusMiles, type: 'bonus' } })
+      }
+      if (promoCode) dispatch({ type: 'SET_SEARCH', search: { promoCode: undefined } })
       const first = created[0] ?? state.trips.find((t) => t.id === firstId)
       if (first) {
         dispatch({
@@ -147,8 +169,6 @@ export function CheckoutPage() {
       setProcessing(false)
     }, 2200)
   }
-
-  const legLabel = legs.length > 1 ? `${legs[0].number} + ${legs[1].number}` : legs[0].number
 
   return (
     <div className="flex-1 flex flex-col bg-surface-off">
@@ -310,6 +330,18 @@ export function CheckoutPage() {
                     </div>
                   )
                 })}
+                {promo && promoDiscount > 0 && (
+                  <div className="flex justify-between text-success">
+                    <span>Promo {promoCode} · {promo.label}</span>
+                    <span className="font-semibold">− {formatRupiah(promoDiscount)}</span>
+                  </div>
+                )}
+                {milesDiscount > 0 && (
+                  <div className="flex justify-between text-success">
+                    <span>GarudaMiles · {formatNumber(milesDiscount / MILES_TO_IDR)} miles</span>
+                    <span className="font-semibold">− {formatRupiah(milesDiscount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-ink-soft">Taxes & fees</span>
                   <span className="font-semibold">{formatRupiah(taxes)}</span>
@@ -324,10 +356,26 @@ export function CheckoutPage() {
             <section>
               <p className="t-label mb-2">Payment method</p>
               <div className="space-y-2" role="radiogroup" aria-label="Payment method">
-                {PAYMENT_METHODS.map((m) => (
-                  <RadioRow key={m.id} icon={PAY_ICONS[m.id as keyof typeof PAY_ICONS]} checked={draft.paymentMethod === m.id} onSelect={() => update({ paymentMethod: m.id })} title={m.label} description={m.detail} />
+                {PAYMENT_METHODS.filter((m) => isMember || m.kind !== 'miles').map((m) => (
+                  <RadioRow key={m.id} icon={PAY_ICONS[m.kind]} checked={draft.paymentMethod === m.id} onSelect={() => update({ paymentMethod: m.id })} title={m.label} description={m.kind === 'miles' ? `${formatNumber(miles.balance)} miles available · 1,000 miles = ${formatRupiah(1000 * MILES_TO_IDR)}` : m.detail} />
                 ))}
               </div>
+              {payingWithMiles && (
+                <div className="mt-2 card p-4 animate-fade-up">
+                  <div className="flex items-center justify-between text-[13px]">
+                    <span className="font-semibold text-ink">Miles to use</span>
+                    <span className="font-bold text-brand-navy tabular-nums">{formatNumber(Math.min(milesToUse, maxMiles))} miles</span>
+                  </div>
+                  <input type="range" min={0} max={maxMiles} step={500} value={Math.min(milesToUse, maxMiles)} onChange={(e) => setMilesToUse(Number(e.target.value))} aria-label="Miles to use" className="w-full accent-brand-turquoise mt-2" />
+                  <div className="flex justify-between text-[11px] text-ink-muted">
+                    <span>0</span>
+                    <span>Up to {formatNumber(maxMiles)} (50% of fare)</span>
+                  </div>
+                  <p className="text-[12px] text-ink-soft mt-2">
+                    Saves <span className="font-semibold text-success">{formatRupiah(milesDiscount)}</span> · remaining {formatRupiah(discountedFare + addOnTotal + taxes)} charged to Visa •••• 4821.
+                  </p>
+                </div>
+              )}
             </section>
 
             <Checkbox

@@ -11,6 +11,7 @@ import { Mascot } from '../components/common/Mascot'
 import { useToast } from '../components/common/Toast'
 import { useApp } from '../store/AppContext'
 import { cityOf } from '../data/airports'
+import { todayISO } from '../utils/share'
 
 export function FlightUpdatePage() {
   const { id } = useParams()
@@ -142,9 +143,13 @@ export function FlightUpdatePage() {
 
       <BottomSheet open={options} onClose={() => setOptions(false)} title="Your options" subtitle={gateChange ? 'A gate change does not affect your booking. Here is what you can still do.' : 'Because this delay is under 2 hours, your flight remains the best option.'}>
         <div className="card divide-y divide-surface-line overflow-hidden mb-2">
-          <ListRow icon={RefreshCw} title="Keep this flight" description={`Departs ${d.newDepartTime} from Gate ${trip.gate} · recommended`} onClick={() => { setOptions(false); toast('You are all set on ' + trip.flightNumber) }} badge="Recommended" />
+          <ListRow icon={RefreshCw} title="Keep this flight" description={`Departs ${d.newDepartTime} from Gate ${trip.gate} · recommended`} onClick={() => { setOptions(false); dispatch({ type: 'UPDATE_TRIP', id: trip.id, patch: { updateAcknowledged: true } }); toast('You are all set on ' + trip.flightNumber) }} badge={trip.updateAcknowledged ? 'Confirmed' : 'Recommended'} />
           <ListRow icon={CalendarClock} title="Move to a later flight" description="Free of charge during a disruption" onClick={() => { setOptions(false); dispatch({ type: 'SET_SEARCH', search: { origin: trip.origin, destination: trip.destination, departDate: trip.date, tripType: 'oneway' } }); navigate('/search-results') }} />
-          <ListRow icon={Sofa} title="Lounge access while you wait" description="Complimentary for delays over 2 hours · discounted today" onClick={() => { setOptions(false); toast('Lounge voucher added to your trip') }} />
+          {trip.addOns?.includes('lounge') ? (
+            <ListRow icon={Sofa} title="Lounge access added" description="Garuda Indonesia Lounge · show your boarding pass at reception" badge="Active" chevron={false} />
+          ) : (
+            <ListRow icon={Sofa} title="Lounge access while you wait" description={d.delayMin >= 120 ? 'Complimentary for this delay' : 'Discounted today · Rp 125,000'} onClick={() => { setOptions(false); dispatch({ type: 'UPDATE_TRIP', id: trip.id, patch: { addOns: [...(trip.addOns ?? []), 'lounge'] } }); dispatch({ type: 'ADD_PURCHASE', purchase: { id: `pu-${Date.now()}`, kind: 'lounge', title: `Lounge access · ${trip.flightNumber}`, detail: 'Garuda Indonesia Lounge · Terminal 3 · disruption rate', price: d.delayMin >= 120 ? 0 : 125000, date: todayISO(), status: 'confirmed' } }); toast('Lounge access added to your trip') }} />
+          )}
           <ListRow icon={MessageCircle} title="Chat with Garuda" description="Average reply time 2 minutes" onClick={() => { setOptions(false); navigate('/help') }} />
         </div>
       </BottomSheet>

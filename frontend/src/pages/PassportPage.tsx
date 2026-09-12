@@ -1,25 +1,35 @@
-import { useState } from 'react'
-import { Check, Lock, Share2, Stamp } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { ArrowRight, Award, Check, Lock, MapPin, Plane, Route, Share2, Sparkles, Stamp, TrendingUp } from 'lucide-react'
 import { AppHeader } from '../components/common/AppHeader'
-import { PageContainer } from '../components/common/Layout'
+import { PageContainer, SectionHeader } from '../components/common/Layout'
 import { Button } from '../components/common/Button'
-import { Modal } from '../components/common/Overlays'
-import { Mascot } from '../components/common/Mascot'
-import { useToast } from '../components/common/Toast'
-import { useApp } from '../store/AppContext'
-import { BADGES, PASSPORT_STAMPS, PASSPORT_STATS } from '../data/miles'
-import { formatNumber } from '../utils/format'
+import { BottomSheet } from '../components/common/Overlays'
+import { ProgressBar } from '../components/common/States'
+import { ShareImageSheet } from '../components/common/ShareImageSheet'
+import { RouteMap } from '../components/miles/RouteMap'
+import { useApp, type ShareTheme } from '../store/AppContext'
+import { BADGES, PASSPORT_STAMPS } from '../data/miles'
+import { SEED_TRIPS } from '../data/trips'
+import { getAirport } from '../data/airports'
+import { renderPassportStory, SHARE_THEMES } from '../utils/storyCard'
+import { distanceKm } from '../utils/geo'
+import { formatNumber, formatShortDate } from '../utils/format'
+import type { AirportCode, Badge, PassportStamp, Trip } from '../types'
 import { cn } from '../utils/cn'
 
-function StampMark({ stamp, index }: { stamp: (typeof PASSPORT_STAMPS)[number]; index: number }) {
+const HOME: AirportCode = 'CGK'
+
+function StampMark({ stamp, index, onClick }: { stamp: PassportStamp; index: number; onClick: () => void }) {
   const rot = ['-rotate-6', 'rotate-3', '-rotate-2', 'rotate-6', '-rotate-3', 'rotate-2'][index % 6]
   return (
-    <div className={cn('aspect-square rounded-2xl border p-2 flex flex-col items-center justify-center text-center transition-all', stamp.collected ? 'bg-white border-surface-line' : 'bg-surface-off border-dashed border-ink-faint/40')}>
+    <button type="button" onClick={onClick} className={cn('aspect-square rounded-2xl border p-2 flex flex-col items-center justify-center text-center transition-all press', stamp.collected ? 'bg-white border-surface-line shadow-card' : 'bg-surface-off border-dashed border-ink-faint/40')}>
       {stamp.collected ? (
-        <div className={cn('h-[68px] w-[68px] rounded-full border-[3px] border-brand-turquoise text-brand-turquoise flex flex-col items-center justify-center', rot)}>
-          <span className="text-[8px] font-bold uppercase tracking-[0.15em] leading-none">Garuda</span>
+        <div className={cn('h-[68px] w-[68px] rounded-full border-[3px] border-brand-turquoise text-brand-turquoise flex flex-col items-center justify-center relative', rot)}>
+          <span className="absolute inset-[5px] rounded-full border border-dashed border-brand-turquoise/50" aria-hidden />
+          <span className="text-[7.5px] font-bold uppercase tracking-[0.15em] leading-none">Garuda</span>
           <span className="text-[16px] font-bold leading-tight tracking-wide">{stamp.code}</span>
-          <span className="text-[7px] font-semibold uppercase tracking-wider leading-none">{stamp.firstVisit}</span>
+          <span className="text-[6.5px] font-semibold uppercase tracking-wider leading-none">{stamp.firstVisit}</span>
         </div>
       ) : (
         <div className="h-[68px] w-[68px] rounded-full border-2 border-dashed border-ink-faint/50 text-ink-faint flex items-center justify-center">
@@ -28,39 +38,122 @@ function StampMark({ stamp, index }: { stamp: (typeof PASSPORT_STAMPS)[number]; 
       )}
       <p className={cn('text-[12px] font-bold mt-2', stamp.collected ? 'text-ink' : 'text-ink-muted')}>{stamp.city}</p>
       <p className="text-[10.5px] text-ink-muted">{stamp.collected ? `${stamp.visits} visit${stamp.visits > 1 ? 's' : ''}` : 'Not yet visited'}</p>
+    </button>
+  )
+}
+
+function ThemePicker({ value, onChange }: { value: ShareTheme; onChange: (t: ShareTheme) => void }) {
+  return (
+    <div className="flex items-center justify-center gap-2" role="radiogroup" aria-label="Story theme">
+      {SHARE_THEMES.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          role="radio"
+          aria-checked={value === t.id}
+          onClick={() => onChange(t.id)}
+          className={cn('inline-flex items-center gap-2 rounded-full border pl-1.5 pr-3 h-9 text-[12px] font-semibold transition-colors', value === t.id ? 'border-brand-navy bg-white text-ink' : 'border-surface-line bg-white text-ink-muted')}
+        >
+          <span className="h-6 w-6 rounded-full ring-2 ring-white shadow-card" style={{ background: `linear-gradient(135deg, ${t.stops[0]}, ${t.stops[2]})` }} />
+          {t.label.split(' ')[1]}
+        </button>
+      ))}
     </div>
   )
 }
 
 export function PassportPage() {
-  const { user } = useApp()
-  const toast = useToast()
+  const { user, miles, state, pastTrips, dispatch } = useApp()
+  const navigate = useNavigate()
   const [share, setShare] = useState(false)
-  const collected = PASSPORT_STAMPS.filter((s) => s.collected)
+  const [shareHeadline, setShareHeadline] = useState<string | undefined>(undefined)
+  const [stamp, setStamp] = useState<PassportStamp | null>(null)
+  const [badge, setBadge] = useState<Badge | null>(null)
+
+  /* Stamps are derived from the seeded passport plus any journey completed in the app. */
+  const stamps = useMemo(() => {
+    const extra = pastTrips.filter((t) => !SEED_TRIPS.some((s) => s.id === t.id))
+    return PASSPORT_STAMPS.map((s) => {
+      const hits = extra.filter((t) => t.destination === s.code)
+      if (hits.length === 0) return s
+      const first = hits.sort((a, b) => (a.date < b.date ? -1 : 1))[0]
+      return { ...s, collected: true, visits: s.visits + hits.length, firstVisit: s.collected ? s.firstVisit : formatShortDate(first.date).slice(3) }
+    })
+  }, [pastTrips])
+  const collected = stamps.filter((s) => s.collected)
+  const locked = stamps.filter((s) => !s.collected)
+  const visitedCodes = collected.map((s) => s.code)
+  const extraTrips = pastTrips.filter((t) => !SEED_TRIPS.some((s) => s.id === t.id))
+  const stats = {
+    flights: 8 + extraTrips.length,
+    destinations: collected.length,
+    distanceKm: 11840 + extraTrips.reduce((s, t) => s + (t.distanceKm ?? distanceKm(t.origin, t.destination)), 0),
+    miles: 8250 + extraTrips.reduce((s, t) => s + (t.milesCredited ? t.milesEstimate : 0), 0),
+  }
+  const routes = visitedCodes.filter((c) => c !== HOME).map((c) => ({ from: HOME, to: c }))
+  const badges = useMemo(
+    () =>
+      BADGES.map((b) => {
+        if (b.id === 'nusantara') {
+          const cur = Math.max(b.current, collected.filter((s) => s.country === 'Indonesia').length)
+          return { ...b, current: cur, earned: cur >= b.target }
+        }
+        if (b.id === 'global') {
+          const cur = Math.max(b.current, collected.filter((s) => s.country !== 'Indonesia').length)
+          return { ...b, current: cur, earned: cur >= b.target }
+        }
+        if (b.id === 'frequent') return { ...b, current: stats.flights, earned: stats.flights >= b.target }
+        return b
+      }),
+    [collected, stats.flights],
+  )
+  const earnedBadges = badges.filter((b) => b.earned)
+  const tripsTo = (code: AirportCode): Trip[] => pastTrips.filter((t) => t.destination === code)
+
+  const highlights = [
+    { icon: Route, label: 'Longest flight', value: 'Jakarta → Tokyo', sub: `${formatNumber(distanceKm('CGK', 'HND'))} km · GA 874` },
+    { icon: MapPin, label: 'Most visited', value: 'Bali', sub: `${stamps.find((s) => s.code === 'DPS')?.visits ?? 3} visits since Mar 2024` },
+    { icon: TrendingUp, label: 'This year', value: `${miles.flightsThisYear} flights`, sub: `${formatNumber(miles.earnedThisYear)} miles earned` },
+    { icon: Plane, label: 'First wings', value: 'Mar 2024', sub: 'GA 400 · Jakarta → Bali' },
+  ]
+
+  const planTrip = (code: AirportCode) => {
+    dispatch({ type: 'SET_SEARCH', search: { origin: HOME, destination: code, tripType: 'round' } })
+    setStamp(null)
+    navigate('/book')
+  }
+
+  const openShare = (headline?: string) => {
+    setShareHeadline(headline)
+    setBadge(null)
+    setShare(true)
+  }
+
   return (
     <div className="flex-1 flex flex-col bg-surface-off">
-      <AppHeader back="/miles" title="My Garuda Passport" right={
-        <Button variant="ghost" size="sm" leftIcon={<Share2 className="h-4 w-4" />} onClick={() => setShare(true)}>
-          Share
-        </Button>
-      } />
-      <PageContainer className="py-4 space-y-5">
-        <section className="card-navy p-5 relative overflow-hidden">
-          <div className="absolute -right-10 -bottom-12 h-44 w-44 rounded-full bg-brand-turquoise/20 blur-2xl" aria-hidden />
+      <div className="card-navy rounded-none rounded-b-[28px] safe-top relative overflow-hidden">
+        <div className="absolute -right-10 -bottom-12 h-44 w-44 rounded-full bg-brand-turquoise/20 blur-2xl" aria-hidden />
+        <div className="absolute -left-16 -top-16 h-56 w-56 rounded-full bg-white/5" aria-hidden />
+        <AppHeader tone="navy" back="/miles" sticky={false} className="bg-transparent" title="My Garuda Passport" right={
+          <Button variant="outline-inverse" size="sm" leftIcon={<Share2 className="h-4 w-4" />} onClick={() => openShare()}>
+            Share
+          </Button>
+        } />
+        <div className="px-5 pb-5">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-turquoise-light">Garuda Flight Passport</p>
               <h1 className="text-[22px] font-bold mt-1">{user.name}</h1>
-              <p className="font-mono text-[12px] text-white/70 tracking-wider">{user.milesId}</p>
+              <p className="font-mono text-[12px] text-white/70 tracking-wider">{user.milesId} · {miles.tier.name}</p>
             </div>
             <Stamp className="h-8 w-8 text-white/40" />
           </div>
-          <dl className="mt-5 grid grid-cols-4 gap-2 text-center">
+          <dl className="mt-4 grid grid-cols-4 gap-2 text-center">
             {[
-              { l: 'Flights', v: String(PASSPORT_STATS.flights) },
-              { l: 'Destinations', v: String(PASSPORT_STATS.destinations) },
-              { l: 'Distance', v: `${formatNumber(PASSPORT_STATS.distanceKm)} km` },
-              { l: 'Miles earned', v: formatNumber(PASSPORT_STATS.milesEarned) },
+              { l: 'Flights', v: String(stats.flights) },
+              { l: 'Destinations', v: String(stats.destinations) },
+              { l: 'Distance', v: `${formatNumber(stats.distanceKm)} km` },
+              { l: 'Miles earned', v: formatNumber(stats.miles) },
             ].map((s) => (
               <div key={s.l} className="rounded-xl bg-white/10 py-2.5 px-1">
                 <dt className="text-[9.5px] uppercase tracking-wider text-white/60">{s.l}</dt>
@@ -68,81 +161,205 @@ export function PassportPage() {
               </div>
             ))}
           </dl>
+          <div className="mt-4 rounded-2xl bg-white/[0.07] border border-white/10 overflow-hidden">
+            <div className="flex items-center justify-between px-3.5 pt-3">
+              <p className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-white/60">Routes flown</p>
+              <p className="text-[10.5px] text-white/60">Tap a city for details</p>
+            </div>
+            <RouteMap visited={visitedCodes} locked={locked.map((s) => s.code)} routes={routes} selected={stamp?.code ?? null} onSelect={(code) => setStamp(stamps.find((s) => s.code === code) ?? null)} className="px-1 -mt-1" />
+          </div>
+        </div>
+      </div>
+
+      <PageContainer className="py-4 space-y-5">
+        <section>
+          <SectionHeader title="Journey highlights" subtitle="Your story with Garuda so far" />
+          <div className="grid grid-cols-2 gap-3">
+            {highlights.map((h) => (
+              <div key={h.label} className="card p-3.5">
+                <span className="h-8 w-8 rounded-lg bg-brand-turquoise-soft text-brand-turquoise flex items-center justify-center">
+                  <h.icon className="h-4 w-4" />
+                </span>
+                <p className="t-label mt-2.5">{h.label}</p>
+                <p className="text-[14px] font-bold text-ink mt-0.5 leading-tight">{h.value}</p>
+                <p className="text-[11px] text-ink-muted mt-0.5">{h.sub}</p>
+              </div>
+            ))}
+          </div>
         </section>
 
         <section>
           <div className="flex items-end justify-between mb-3">
             <div>
               <h2 className="t-h2">Destination stamps</h2>
-              <p className="t-caption mt-0.5">{collected.length} of {PASSPORT_STAMPS.length} collected · next milestone: Nusantara Explorer</p>
+              <p className="t-caption mt-0.5">{collected.length} of {stamps.length} collected · next milestone: Nusantara Explorer</p>
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
-            {PASSPORT_STAMPS.map((s, i) => (
-              <StampMark key={s.code} stamp={s} index={i} />
+            {stamps.map((s, i) => (
+              <StampMark key={s.code} stamp={s} index={i} onClick={() => setStamp(s)} />
             ))}
           </div>
         </section>
 
         <section>
-          <h2 className="t-h2 mb-3">Badges</h2>
+          <SectionHeader title="Badges" subtitle={`${earnedBadges.length} of ${badges.length} earned`} />
           <div className="grid grid-cols-2 gap-3">
-            {BADGES.map((b) => (
-              <div key={b.id} className={cn('card p-4', !b.earned && 'opacity-90')}>
-                <span className={cn('h-11 w-11 rounded-full flex items-center justify-center', b.earned ? 'bg-brand-gold-soft text-[#8A6A1F]' : 'bg-surface-soft text-ink-faint')}>
+            {badges.map((b) => (
+              <button key={b.id} type="button" onClick={() => setBadge(b)} className={cn('card p-4 text-left press', !b.earned && 'bg-white/80')}>
+                <span className={cn('h-11 w-11 rounded-full flex items-center justify-center', b.earned ? 'bg-brand-gold-soft text-[#8A6A1F] ring-2 ring-brand-gold/40' : 'bg-surface-soft text-ink-faint')}>
                   <b.icon className="h-5 w-5" />
                 </span>
                 <p className="text-[13.5px] font-bold text-ink mt-3">{b.name}</p>
                 <p className="text-[11.5px] text-ink-muted mt-0.5 leading-snug">{b.description}</p>
-                <p className={cn('text-[11px] font-semibold mt-2 inline-flex items-center gap-1', b.earned ? 'text-success' : 'text-brand-blue')}>
-                  {b.earned ? (
-                    <>
-                      <Check className="h-3 w-3" /> Earned
-                    </>
-                  ) : (
-                    `${b.progress} · in progress`
-                  )}
-                </p>
-              </div>
+                {b.earned ? (
+                  <p className="text-[11px] font-semibold mt-2 inline-flex items-center gap-1 text-success">
+                    <Check className="h-3 w-3" /> Earned {b.earnedOn ?? ''}
+                  </p>
+                ) : (
+                  <div className="mt-2">
+                    <ProgressBar value={b.current} max={b.target} tone="navy" label={`${b.name} progress`} />
+                    <p className="text-[11px] font-semibold text-brand-blue mt-1">{b.current} / {b.target} · in progress</p>
+                  </div>
+                )}
+              </button>
             ))}
           </div>
         </section>
 
-        <Button full size="lg" leftIcon={<Share2 className="h-4 w-4" />} onClick={() => setShare(true)}>
+        <Button full size="lg" leftIcon={<Share2 className="h-4 w-4" />} onClick={() => openShare()}>
           Share Journey
         </Button>
+        <p className="text-[11px] text-ink-faint text-center pb-2">Creates a real Instagram-story image (1080 × 1920) you can save or share.</p>
       </PageContainer>
 
-      <Modal open={share} onClose={() => setShare(false)} title="Share your journey">
-        <div className="mx-auto w-[220px] aspect-[9/16] rounded-[22px] card-navy p-4 flex flex-col relative overflow-hidden shadow-float">
-          <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-brand-turquoise/25 blur-2xl" aria-hidden />
-          <img src="/brand/wordmark-white.png" alt="Garuda Indonesia" className="h-4 w-auto self-start opacity-90" />
-          <p className="text-[9px] uppercase tracking-[0.16em] text-brand-turquoise-light mt-4">My Garuda Passport</p>
-          <p className="text-[18px] font-bold leading-tight mt-1">{PASSPORT_STATS.destinations} destinations,<br />{formatNumber(PASSPORT_STATS.distanceKm)} km flown.</p>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {collected.map((s) => (
-              <span key={s.code} className="rounded-full border border-white/40 px-2 py-0.5 text-[9px] font-bold tracking-wider">
-                {s.code}
-              </span>
-            ))}
-          </div>
-          <div className="mt-auto flex items-end justify-between">
-            <div>
-              <p className="text-[9px] text-white/60">{user.name}</p>
-              <p className="text-[9px] text-white/60">GarudaMiles Silver</p>
+      {/* Stamp detail */}
+      <BottomSheet
+        open={stamp !== null}
+        onClose={() => setStamp(null)}
+        title={stamp ? `${stamp.city} · ${stamp.code}` : undefined}
+        subtitle={stamp ? `${getAirport(stamp.code).name} · ${stamp.country}` : undefined}
+        footer={
+          stamp ? (
+            <Button full rightIcon={<ArrowRight className="h-4 w-4" />} onClick={() => planTrip(stamp.code)}>
+              {stamp.collected ? (stamp.code === HOME ? 'Search flights from Jakarta' : `Fly to ${stamp.city} again`) : `Plan a trip to ${stamp.city}`}
+            </Button>
+          ) : undefined
+        }
+      >
+        {stamp && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-2 text-center">
+              {[
+                { l: 'Visits', v: String(stamp.visits) },
+                { l: 'First visit', v: stamp.firstVisit },
+                { l: 'From Jakarta', v: stamp.code === HOME ? 'Home' : `${formatNumber(distanceKm(HOME, stamp.code))} km` },
+              ].map((s) => (
+                <div key={s.l} className="rounded-xl bg-surface-off p-3">
+                  <p className="t-label">{s.l}</p>
+                  <p className="text-[14px] font-bold text-ink mt-1 leading-tight">{s.v}</p>
+                </div>
+              ))}
             </div>
-            <Mascot name="wave" size={72} className="-mr-2 -mb-2" />
+            {stamp.collected ? (
+              <div>
+                <p className="t-label mb-2">Flights to {stamp.city}</p>
+                <div className="card divide-y divide-surface-line overflow-hidden">
+                  {tripsTo(stamp.code).length === 0 ? (
+                    <p className="px-4 py-3 text-[12.5px] text-ink-muted">Flown before this account was linked to FlyGaruda.</p>
+                  ) : (
+                    tripsTo(stamp.code).map((t) => (
+                      <button key={t.id} type="button" onClick={() => { setStamp(null); navigate(`/trips/${t.id}`) }} className="w-full px-4 py-3 flex items-center gap-3 text-left tap">
+                        <span className="h-9 w-9 rounded-xl bg-brand-turquoise-soft text-brand-turquoise flex items-center justify-center"><Plane className="h-4 w-4" /></span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-[13px] font-semibold text-ink">{t.flightNumber} · {t.origin} → {t.destination}</span>
+                          <span className="block text-[11.5px] text-ink-muted">{formatShortDate(t.date)} · {formatNumber(t.milesEstimate)} miles</span>
+                        </span>
+                        <ArrowRight className="h-4 w-4 text-ink-faint" />
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl bg-brand-gold-soft border border-brand-gold/30 p-3.5 text-[12.5px] text-ink flex items-start gap-2">
+                <Sparkles className="h-4 w-4 text-[#8A6A1F] shrink-0 mt-0.5" />
+                <span>
+                  Visiting {stamp.city} unlocks this stamp{stamp.country === 'Indonesia' ? ' and completes Nusantara Explorer' : ' and counts towards Global Explorer'}. Estimated earning: about {formatNumber(Math.round(distanceKm(HOME, stamp.code) * 0.75))} miles at your tier.
+                </span>
+              </div>
+            )}
           </div>
-        </div>
-        <div className="mt-5 flex gap-2">
-          <Button variant="secondary" full onClick={() => setShare(false)}>
-            Close
-          </Button>
-          <Button full onClick={() => { setShare(false); toast('Story card saved to your photos') }}>
-            Save image
-          </Button>
-        </div>
-      </Modal>
+        )}
+      </BottomSheet>
+
+      {/* Badge detail */}
+      <BottomSheet
+        open={badge !== null}
+        onClose={() => setBadge(null)}
+        title={badge?.name}
+        subtitle={badge?.description}
+        footer={
+          badge ? (
+            badge.earned ? (
+              <Button full leftIcon={<Share2 className="h-4 w-4" />} onClick={() => openShare(`I just earned the ${badge.name} badge with Garuda Indonesia.`)}>
+                Share this badge
+              </Button>
+            ) : (
+              <Button full rightIcon={<ArrowRight className="h-4 w-4" />} onClick={() => { setBadge(null); navigate('/book') }}>
+                Book a flight to progress
+              </Button>
+            )
+          ) : undefined
+        }
+      >
+        {badge && (
+          <div className="flex flex-col items-center text-center">
+            <span className={cn('h-20 w-20 rounded-full flex items-center justify-center', badge.earned ? 'bg-brand-gold-soft text-[#8A6A1F] ring-4 ring-brand-gold/30' : 'bg-surface-soft text-ink-faint')}>
+              <badge.icon className="h-9 w-9" />
+            </span>
+            {badge.earned ? (
+              <p className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-semibold text-success">
+                <Award className="h-4 w-4" /> Earned {badge.earnedOn}
+              </p>
+            ) : (
+              <div className="mt-4 w-full">
+                <ProgressBar value={badge.current} max={badge.target} tone="gold" label="Badge progress" />
+                <p className="text-[12.5px] text-ink-muted mt-2">
+                  <span className="font-semibold text-ink">{badge.current} of {badge.target}</span> · {badge.target - badge.current} more to unlock
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </BottomSheet>
+
+      <ShareImageSheet
+        open={share}
+        onClose={() => setShare(false)}
+        title="Share your journey"
+        subtitle="Instagram-story card of your Garuda Passport"
+        filename={`garuda-passport-${user.firstName.toLowerCase()}-${new Date().getFullYear()}.png`}
+        shareTitle="My Garuda Passport"
+        shareText={`${stats.destinations} destinations and ${formatNumber(stats.distanceKm)} km flown with Garuda Indonesia. #ActivateTheJourney`}
+        controls={<ThemePicker value={state.shareTheme} onChange={(t) => dispatch({ type: 'SET_SHARE_THEME', value: t })} />}
+        render={() =>
+          renderPassportStory({
+            name: user.name,
+            tier: miles.tier.name,
+            milesId: user.milesId,
+            memberSince: user.memberSince,
+            stats,
+            stamps: collected.filter((s) => s.code !== HOME).map((s) => ({ code: s.code, city: s.city, firstVisit: s.firstVisit })),
+            routes,
+            visited: visitedCodes,
+            badges: earnedBadges.map((b) => b.name),
+            theme: state.shareTheme,
+            headline: shareHeadline,
+          })
+        }
+        deps={[state.shareTheme, shareHeadline, stats.flights, stats.destinations]}
+      />
     </div>
   )
 }

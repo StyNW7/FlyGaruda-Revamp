@@ -1,16 +1,23 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, BookMarked, ChevronRight, Compass, Crown, Gift, Plane, Sparkles, Stamp, Wifi } from 'lucide-react'
+import { ArrowRight, Calculator, ChevronRight, Compass, Crown, Gift, Hourglass, Plane, PlusCircle, Sparkles, Stamp, Ticket, Wifi } from 'lucide-react'
 import { AppHeader } from '../components/common/AppHeader'
 import { PageContainer, SectionHeader } from '../components/common/Layout'
 import { Button } from '../components/common/Button'
 import { ProgressBar } from '../components/common/States'
 import { Mascot, MascotBanner } from '../components/common/Mascot'
 import { ListRow } from '../components/common/ListRow'
+import { SegmentedTabs } from '../components/common/Tabs'
 import { MilesChart } from '../components/miles/MilesChart'
+import { MembershipCard } from '../components/miles/MembershipCard'
+import { TierLadder } from '../components/miles/TierLadder'
+import { RewardSheet } from '../components/miles/RewardSheet'
+import { MilesCalculator } from '../components/miles/MilesCalculator'
+import { ActivityRow } from '../components/miles/ActivityRow'
 import { useApp } from '../store/AppContext'
-import { MILES_ACTIVITY, MILES_NEXT, MILES_SUMMARY, REWARDS } from '../data/miles'
-import { VALUE_ITEMS } from '../data/flights'
-import { formatNumber } from '../utils/format'
+import { EARN_PARTNERS, MILES_NEXT, REWARDS, findReward } from '../data/miles'
+import type { Reward } from '../types'
+import { formatNumber, formatShortDate } from '../utils/format'
 import { cn } from '../utils/cn'
 
 function MilesLogin() {
@@ -36,12 +43,12 @@ function MilesLogin() {
           <Button full size="lg" className="mt-4" onClick={() => navigate('/login', { state: { from: '/miles' } })} rightIcon={<ArrowRight className="h-4 w-4" />}>
             Sign In
           </Button>
-          <Button full variant="secondary" className="mt-2" onClick={() => navigate('/login', { state: { from: '/miles' } })}>
+          <Button full variant="secondary" className="mt-2" onClick={() => navigate('/login', { state: { from: '/miles', join: true } })}>
             Join GarudaMiles — free
           </Button>
         </section>
         <section>
-          <SectionHeader title="Member benefits" subtitle="What Silver, Gold and Platinum unlock" />
+          <SectionHeader title="Member benefits" subtitle="What Silver, Gold and Platinum unlock" action="Compare tiers" to="/miles/benefits" />
           <div className="card divide-y divide-surface-line overflow-hidden">
             <ListRow icon={Sparkles} iconTone="gold" title="Priority services" description="Priority check-in, boarding and baggage" chevron={false} />
             <ListRow icon={Plane} iconTone="gold" title="Award tickets" description="Jakarta → Bali from 7,500 miles" chevron={false} />
@@ -53,78 +60,80 @@ function MilesLogin() {
   )
 }
 
-function StatTile({ label, value, sub, className }: { label: string; value: string; sub?: string; className?: string }) {
+function StatTile({ label, value, sub, className, onClick }: { label: string; value: string; sub?: string; className?: string; onClick?: () => void }) {
+  const Tag = onClick ? 'button' : 'div'
   return (
-    <div className={cn('card p-3.5', className)}>
+    <Tag type={onClick ? 'button' : undefined} onClick={onClick} className={cn('card p-3.5 text-left', onClick && 'press', className)}>
       <p className="t-label">{label}</p>
       <p className="text-[20px] font-bold text-ink tracking-tight mt-1 leading-tight">{value}</p>
       {sub && <p className="text-[11.5px] text-ink-muted mt-0.5">{sub}</p>}
-    </div>
+    </Tag>
   )
 }
 
 function Dashboard() {
-  const { user } = useApp()
+  const { user, miles } = useApp()
   const navigate = useNavigate()
-  const m = MILES_SUMMARY
-  const pct = Math.round((m.tierMiles / m.tierTarget) * 100)
+  const [range, setRange] = useState<'6' | '12'>('6')
+  const [reward, setReward] = useState<Reward | null>(null)
+  const [calc, setCalc] = useState(false)
+  const nextReward = findReward(MILES_NEXT.flightsProgress.rewardId)
+
+  const quick = [
+    { icon: Gift, label: 'Redeem', onClick: () => navigate('/miles/benefits?tab=rewards') },
+    { icon: Ticket, label: 'My Rewards', badge: miles.activeVouchers.length || undefined, onClick: () => navigate('/miles/rewards') },
+    { icon: Calculator, label: 'Calculator', onClick: () => setCalc(true) },
+    { icon: PlusCircle, label: 'Claim miles', onClick: () => navigate('/miles/activity?claim=1') },
+  ]
+
   return (
     <div className="flex-1 flex flex-col bg-surface-off">
-      <AppHeader large title="GarudaMiles" right={<Button variant="ghost" size="sm" onClick={() => navigate('/miles/activity')}>Activity</Button>} />
+      <AppHeader large title="GarudaMiles" subtitle={`${user.firstName} · ${miles.tier.name} member`} right={<Button variant="ghost" size="sm" onClick={() => navigate('/miles/activity')}>Activity</Button>} />
       <PageContainer className="py-4 space-y-5">
-        <section className="card-navy p-5 relative overflow-hidden" aria-label="Membership card">
-          <div className="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-white/5" aria-hidden />
-          <div className="absolute right-0 bottom-0 h-28 w-28 rounded-full bg-brand-gold/20 blur-2xl" aria-hidden />
-          <div className="flex items-start justify-between">
-            <img src="/brand/mark-white.png" alt="Garuda Indonesia" className="h-6 w-auto" />
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 border border-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em]">
-              <Crown className="h-3.5 w-3.5 text-brand-gold" /> {m.tier}
-            </span>
-          </div>
-          <p className="text-[11px] uppercase tracking-[0.14em] text-white/60 mt-6">Miles balance</p>
-          <p className="text-[38px] font-bold tracking-tight leading-none mt-1">{formatNumber(m.balance)}</p>
-          <div className="mt-5 flex items-end justify-between">
-            <div>
-              <p className="text-[14px] font-semibold">{user.name}</p>
-              <p className="font-mono text-[12px] text-white/70 tracking-wider">{user.milesId}</p>
-            </div>
-            <p className="text-[11px] text-white/60 text-right">
-              Member since {user.memberSince}
-              <br />
-              {formatNumber(m.expiringMiles)} miles expire {m.expiringOn}
-            </p>
+        <MembershipCard />
+
+        <section aria-label="Quick actions" className="card px-2 py-3">
+          <div className="grid grid-cols-4">
+            {quick.map((q) => (
+              <button key={q.label} type="button" onClick={q.onClick} className="flex flex-col items-center gap-1.5 py-1 press relative">
+                <span className="h-12 w-12 rounded-2xl bg-brand-gold-soft text-[#8A6A1F] flex items-center justify-center">
+                  <q.icon className="h-[22px] w-[22px]" strokeWidth={1.9} />
+                </span>
+                {q.badge ? <span className="absolute top-0 right-3 h-5 min-w-[20px] px-1 rounded-full bg-brand-turquoise text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white">{q.badge}</span> : null}
+                <span className="text-[12px] font-semibold leading-tight text-center text-ink">{q.label}</span>
+              </button>
+            ))}
           </div>
         </section>
 
-        <section className="card p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="t-label">Tier progress</p>
-              <p className="text-[15px] font-bold text-ink mt-0.5">
-                {m.tier} <ArrowRight className="inline h-3.5 w-3.5 text-ink-faint mx-0.5" /> {m.nextTier}
-              </p>
-            </div>
-            <span className="text-[22px] font-bold text-brand-navy">{pct}%</span>
-          </div>
-          <ProgressBar value={m.tierMiles} max={m.tierTarget} tone="gold" className="mt-3" label="Tier miles progress" />
-          <div className="mt-2 flex justify-between text-[12px] text-ink-muted">
-            <span>
-              <span className="font-semibold text-ink">{formatNumber(m.tierMiles)}</span> / {formatNumber(m.tierTarget)} tier miles
+        {miles.expiringMiles > 0 && (
+          <button type="button" onClick={() => navigate('/miles/benefits?tab=rewards')} className="w-full flex items-center gap-3 rounded-2xl bg-warning-soft border border-warning/30 p-3.5 text-left press">
+            <span className="h-10 w-10 rounded-xl bg-white text-warning flex items-center justify-center shrink-0">
+              <Hourglass className="h-5 w-5" />
             </span>
-            <span>{formatNumber(m.tierTarget - m.tierMiles)} to Gold</span>
-          </div>
-        </section>
+            <span className="flex-1 min-w-0">
+              <span className="block text-[13.5px] font-bold text-ink">{formatNumber(miles.expiringMiles)} miles expire on {formatShortDate(miles.expiringOn)}</span>
+              <span className="block text-[12px] text-ink-soft">Redeem a Wi-Fi pass or lounge voucher before they lapse.</span>
+            </span>
+            <ChevronRight className="h-4 w-4 text-ink-muted" />
+          </button>
+        )}
+
+        <TierLadder />
 
         <div className="grid grid-cols-2 gap-3">
-          <StatTile label="Available miles" value={formatNumber(m.balance)} sub="Ready to redeem" />
-          <StatTile label="Tier" value={m.tier} sub={`Next: ${m.nextTier}`} />
-          <StatTile label="Flights this year" value={String(m.flightsThisYear)} sub="Garuda & partners" />
-          <StatTile label="Destinations" value={String(m.destinations)} sub="Since joining" />
+          <StatTile label="Available miles" value={formatNumber(miles.balance)} sub="Ready to redeem" onClick={() => navigate('/miles/benefits?tab=rewards')} />
+          <StatTile label="Earned this year" value={formatNumber(miles.earnedThisYear)} sub={`${formatNumber(miles.redeemedThisYear)} redeemed`} onClick={() => navigate('/miles/activity')} />
+          <StatTile label="Flights this year" value={String(miles.flightsThisYear)} sub="Garuda & partners" onClick={() => navigate('/trips')} />
+          <StatTile label="Destinations" value={String(miles.destinations)} sub="Since joining" onClick={() => navigate('/miles/passport')} />
         </div>
 
         <section className="card p-4">
-          <SectionHeader title="Miles earned" subtitle="Last six months · flights and partners" className="mb-1" />
-          <MilesChart />
+          <div className="flex items-start justify-between gap-3 mb-1">
+            <SectionHeader title="Miles earned" subtitle={range === '6' ? 'Last six months · flights and partners' : 'Last twelve months'} className="mb-0" />
+            <SegmentedTabs value={range} onChange={setRange} items={[{ id: '6', label: '6M' }, { id: '12', label: '12M' }]} className="w-[104px] shrink-0" />
+          </div>
+          <MilesChart months={range === '6' ? 6 : 12} />
         </section>
 
         <section className="rounded-2xl border border-brand-gold/30 bg-gradient-to-br from-brand-gold-soft to-white p-4">
@@ -138,9 +147,9 @@ function Dashboard() {
                 <span className="font-semibold text-ink inline-flex items-center gap-1.5">
                   <Plane className="h-3.5 w-3.5 text-brand-navy" /> Your progress · {MILES_NEXT.flightsProgress.current} / {MILES_NEXT.flightsProgress.target} flights
                 </span>
-                <span className="text-ink-muted inline-flex items-center gap-1">
-                  <Wifi className="h-3.5 w-3.5" /> {MILES_NEXT.flightsProgress.reward}
-                </span>
+                <button type="button" onClick={() => nextReward && setReward(nextReward)} className="text-brand-blue font-semibold inline-flex items-center gap-1">
+                  <Wifi className="h-3.5 w-3.5" /> Wi-Fi Pass
+                </button>
               </div>
               <ProgressBar value={MILES_NEXT.flightsProgress.current} max={MILES_NEXT.flightsProgress.target} tone="navy" className="mt-1.5" label="Flights progress" />
             </div>
@@ -163,51 +172,61 @@ function Dashboard() {
         </section>
 
         <section>
-          <SectionHeader title="Redeem" action="Benefits" to="/miles/benefits" />
+          <SectionHeader title="Redeem miles" subtitle={`${formatNumber(miles.balance)} miles available`} action="All rewards" to="/miles/benefits?tab=rewards" />
           <div className="grid grid-cols-2 gap-3">
-            {REWARDS.map((r) => (
-              <button key={r.title} type="button" onClick={() => navigate('/miles/benefits')} className="card p-3.5 text-left press">
-                <span className="h-9 w-9 rounded-xl bg-brand-blue-light text-brand-blue flex items-center justify-center">
-                  <r.icon className="h-[18px] w-[18px]" />
-                </span>
-                <p className="text-[13.5px] font-bold text-ink mt-2.5">{r.title}</p>
-                <p className="text-[11.5px] text-ink-muted mt-0.5 leading-snug">{r.description}</p>
-              </button>
-            ))}
+            {REWARDS.slice(0, 4).map((r) => {
+              const enough = miles.balance >= r.miles
+              return (
+                <button key={r.id} type="button" onClick={() => setReward(r)} className="card p-3.5 text-left press">
+                  <span className="flex items-center justify-between">
+                    <span className="h-9 w-9 rounded-xl bg-brand-blue-light text-brand-blue flex items-center justify-center">
+                      <r.icon className="h-[18px] w-[18px]" />
+                    </span>
+                    <span className={cn('text-[10px] font-bold rounded-full px-2 py-0.5', enough ? 'bg-success-soft text-success' : 'bg-surface-soft text-ink-muted')}>{enough ? 'Available' : 'Save up'}</span>
+                  </span>
+                  <p className="text-[13.5px] font-bold text-ink mt-2.5 leading-snug">{r.title}</p>
+                  <p className="text-[11.5px] text-ink-muted mt-0.5 leading-snug">{r.description}</p>
+                  <p className="text-[12px] font-bold text-brand-navy mt-1.5">{formatNumber(r.miles)} miles</p>
+                </button>
+              )
+            })}
           </div>
         </section>
 
-        <MascotBanner mascot="love" tone="turquoise" title="Reward unlocked: 2 of 3 flights" description="One more Garuda flight and your Complimentary Wi-Fi Pass is yours." size={76} />
+        <MascotBanner
+          mascot="love"
+          tone="turquoise"
+          title={`Reward unlocked: ${MILES_NEXT.flightsProgress.current} of ${MILES_NEXT.flightsProgress.target} flights`}
+          description="One more Garuda flight and your Complimentary Wi-Fi Pass is yours."
+          size={76}
+          action={
+            <Button size="sm" variant="secondary" onClick={() => navigate('/book')}>
+              Book a flight
+            </Button>
+          }
+        />
 
         <section>
           <SectionHeader title="Recent activity" action="See all" to="/miles/activity" />
           <div className="card divide-y divide-surface-line overflow-hidden">
-            {MILES_ACTIVITY.slice(0, 3).map((a) => (
-              <div key={a.id} className="px-4 py-3 flex items-center gap-3">
-                <span className={cn('h-9 w-9 rounded-xl flex items-center justify-center shrink-0', a.type === 'redeem' ? 'bg-surface-soft text-ink-muted' : a.type === 'bonus' ? 'bg-brand-gold-soft text-[#8A6A1F]' : 'bg-brand-turquoise-soft text-brand-turquoise')}>
-                  {a.type === 'redeem' ? <Gift className="h-4 w-4" /> : a.type === 'bonus' ? <Sparkles className="h-4 w-4" /> : <Plane className="h-4 w-4" />}
-                </span>
-                <span className="flex-1 min-w-0">
-                  <span className="block text-[13px] font-semibold text-ink truncate">{a.title}</span>
-                  <span className="block text-[11.5px] text-ink-muted">{a.date}</span>
-                </span>
-                <span className={cn('text-[13px] font-bold tabular-nums', a.miles < 0 ? 'text-ink-muted' : 'text-success')}>
-                  {a.miles > 0 ? '+' : ''}
-                  {formatNumber(a.miles)}
-                </span>
-              </div>
+            {miles.activity.slice(0, 4).map((a) => (
+              <ActivityRow key={a.id} activity={a} compact />
             ))}
           </div>
         </section>
 
-        <section className="card p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <BookMarked className="h-4 w-4 text-brand-turquoise" />
-            <p className="text-[14px] font-bold text-ink">Earn on every Garuda fare</p>
+        <section>
+          <SectionHeader title="Earn more miles" subtitle="Beyond flying" />
+          <div className="card divide-y divide-surface-line overflow-hidden">
+            {EARN_PARTNERS.map((p) => (
+              <ListRow key={p.id} icon={p.icon} iconTone="turquoise" title={p.title} description={p.note} right={<span className="text-[11.5px] font-semibold text-brand-navy text-right whitespace-nowrap">{p.rate}</span>} chevron={false} />
+            ))}
           </div>
-          <p className="text-[12.5px] text-ink-muted">{VALUE_ITEMS[3].description}. Silver members receive a 25% tier bonus.</p>
         </section>
       </PageContainer>
+
+      <RewardSheet reward={reward} onClose={() => setReward(null)} />
+      <MilesCalculator open={calc} onClose={() => setCalc(false)} />
     </div>
   )
 }

@@ -1,3 +1,15 @@
+import type { PurchaseKind } from '../types'
+
+export interface CatalogItem {
+  id: string
+  title: string
+  detail: string
+  price: number
+  /** Miles earned on this purchase (partner earning). */
+  miles?: number
+  tag?: string
+}
+
 export interface FeatureContent {
   intro: string
   highlights?: { title: string; description: string }[]
@@ -5,6 +17,8 @@ export interface FeatureContent {
   faqs?: { q: string; a: string }[]
   cta?: { label: string; to?: string; message?: string }
   note?: string
+  /** Bookable partner catalogue — purchases are stored in the account. */
+  catalog?: { kind: PurchaseKind; unit?: string; items: CatalogItem[] }
 }
 
 export const FEATURE_CONTENT: Record<string, FeatureContent> = {
@@ -94,11 +108,7 @@ export const FEATURE_CONTENT: Record<string, FeatureContent> = {
   },
   'e-library': {
     intro: 'Read Colours magazine, newspapers and guides before and during your flight.',
-    sections: [
-      { title: 'This month', items: ['Colours · September 2026 · Bali Beyond the Beaches', 'Garuda News · New A330-900neo cabin', 'Onboard · Menu highlights this season'] },
-      { title: 'Newspapers', items: ['Kompas', 'The Jakarta Post', 'The Straits Times'] },
-    ],
-    cta: { label: 'Download Colours for offline reading', message: 'Colours September 2026 saved for offline reading' },
+    note: 'Saved titles are available without connection, including in flight.',
   },
   charter: {
     intro: 'Private and group charter flights for corporate travel, sports teams, pilgrimages and special events.',
@@ -128,7 +138,14 @@ export const FEATURE_CONTENT: Record<string, FeatureContent> = {
       { title: 'Garuda Heritage collection', description: 'Batik scarves, model aircraft and travel accessories' },
       { title: 'Duty-free pre-order', description: 'Order 48 hours before an international flight' },
     ],
-    cta: { label: 'Browse the collection', message: 'GarudaShop catalogue opens in the live app' },
+    catalog: {
+      kind: 'shop',
+      items: [
+        { id: 'sh-batik', title: 'Heritage batik scarf', detail: 'Silk · Garuda navy · delivered to your seat', price: 485000, miles: 97 },
+        { id: 'sh-model', title: 'A330-900neo model aircraft', detail: '1:200 scale · collector edition', price: 1250000, miles: 250, tag: 'Collector' },
+        { id: 'sh-tag', title: 'Leather luggage tag set', detail: 'Two tags · personalised initials', price: 225000, miles: 45 },
+      ],
+    },
   },
   'things-to-do': {
     intro: 'Curated tours and experiences at your destination, bookable with GarudaMiles.',
@@ -137,7 +154,15 @@ export const FEATURE_CONTENT: Record<string, FeatureContent> = {
       { title: 'Uluwatu temple & Kecak dance', description: 'Bali · from Rp 380,000 or 3,800 miles' },
       { title: 'Marina Bay night tour', description: 'Singapore · from Rp 520,000' },
     ],
-    cta: { label: 'Explore Bali experiences', message: 'Experiences for your Bali trip are ready to book' },
+    catalog: {
+      kind: 'experience',
+      unit: 'per person',
+      items: [
+        { id: 'ex-ubud', title: 'Ubud rice terrace sunrise', detail: 'Bali · 5 hours · hotel pick-up · or 4,500 miles', price: 450000, miles: 90 },
+        { id: 'ex-uluwatu', title: 'Uluwatu temple & Kecak dance', detail: 'Bali · evening · or 3,800 miles', price: 380000, miles: 76, tag: 'Popular' },
+        { id: 'ex-marina', title: 'Marina Bay night tour', detail: 'Singapore · 3 hours', price: 520000, miles: 104 },
+      ],
+    },
   },
   'airport-transfer': {
     intro: 'Pre-book a car from your door to Terminal 3, timed to your recommended arrival.',
@@ -146,8 +171,14 @@ export const FEATURE_CONTENT: Record<string, FeatureContent> = {
       { title: 'Standard sedan', description: 'Rp 185,000 · up to 3 passengers' },
       { title: 'Premium MPV', description: 'Rp 265,000 · up to 5 passengers' },
     ],
-    sections: [{ title: 'Purchase history', items: ['12 Aug 2026 · Home → Terminal 3 · Rp 185,000', '18 Aug 2026 · Ngurah Rai → Seminyak · Rp 160,000'] }],
-    cta: { label: 'Book pick-up for GA 412', message: 'Airport transfer booked · pick-up 05:20 on 19 Sep' },
+    catalog: {
+      kind: 'transfer',
+      items: [
+        { id: 'tr-sedan', title: 'Standard sedan · Home → Terminal 3', detail: 'Sat 19 Sep · pick-up 05:20 · up to 3 passengers', price: 185000, miles: 37, tag: 'For GA 412' },
+        { id: 'tr-mpv', title: 'Premium MPV · Home → Terminal 3', detail: 'Sat 19 Sep · pick-up 05:20 · up to 5 passengers', price: 265000, miles: 53 },
+        { id: 'tr-dps', title: 'Ngurah Rai → Seminyak', detail: 'On arrival · meet & greet at Domestic Terminal', price: 160000, miles: 32 },
+      ],
+    },
   },
   'car-rental': {
     intro: 'Rental cars from trusted partners, with GarudaMiles earning on every booking.',
@@ -155,8 +186,15 @@ export const FEATURE_CONTENT: Record<string, FeatureContent> = {
       { title: 'Denpasar · 19 – 23 Sep', description: 'Compact from Rp 320,000 per day' },
       { title: 'Earn miles', description: '2 miles per Rp 10,000 spent' },
     ],
-    sections: [{ title: 'Purchase history', items: ['Mar 2024 · Denpasar · Toyota Avanza · 3 days'] }],
-    cta: { label: 'Search cars in Denpasar', message: 'Car rental partner search opens in the live app' },
+    catalog: {
+      kind: 'car',
+      unit: 'per day',
+      items: [
+        { id: 'car-compact', title: 'Compact · Toyota Agya', detail: 'Denpasar · 19 – 23 Sep · 4 days · with driver optional', price: 320000, miles: 64 },
+        { id: 'car-mpv', title: 'MPV · Toyota Innova', detail: 'Denpasar · 19 – 23 Sep · 4 days · 7 seats', price: 520000, miles: 104, tag: 'Family' },
+        { id: 'car-suv', title: 'SUV · Toyota Fortuner', detail: 'Denpasar · 19 – 23 Sep · 4 days', price: 780000, miles: 156 },
+      ],
+    },
   },
   'roaming-package': {
     intro: 'Stay connected abroad with roaming packages from Indosat and Telkomsel, activated before you land.',
@@ -164,8 +202,15 @@ export const FEATURE_CONTENT: Record<string, FeatureContent> = {
       { title: 'Telkomsel · Singapore 3 days', description: '5 GB · Rp 85,000' },
       { title: 'Indosat · Japan 7 days', description: '10 GB · Rp 220,000' },
     ],
-    sections: [{ title: 'Purchase history', items: ['Jun 2026 · Indosat Japan 7 days · Rp 220,000', 'Jan 2025 · Telkomsel Singapore 3 days · Rp 85,000'] }],
-    cta: { label: 'Activate for GA 860 to Singapore', message: 'Telkomsel Singapore package will activate on arrival · 3 Oct' },
+    catalog: {
+      kind: 'roaming',
+      items: [
+        { id: 'rm-sg3', title: 'Telkomsel · Singapore 3 days', detail: '5 GB · activates on arrival · for GA 860 on 3 Oct', price: 85000, tag: 'Next trip' },
+        { id: 'rm-sg7', title: 'Telkomsel · Singapore 7 days', detail: '12 GB · activates on arrival', price: 150000 },
+        { id: 'rm-jp7', title: 'Indosat · Japan 7 days', detail: '10 GB · activates on arrival', price: 220000 },
+        { id: 'rm-asia', title: 'Indosat · Asia Pacific 10 days', detail: '15 GB · 12 countries', price: 310000 },
+      ],
+    },
   },
   hotels: {
     intro: 'Partner hotels that earn GarudaMiles on every stay.',
@@ -173,7 +218,15 @@ export const FEATURE_CONTENT: Record<string, FeatureContent> = {
       { title: 'Nusantara Hotels · Seminyak', description: 'From Rp 1,150,000 per night · 600 miles' },
       { title: 'Harbour Suites · Singapore', description: 'From Rp 2,400,000 per night · 900 miles' },
     ],
-    cta: { label: 'Find stays in Bali', message: 'Hotel partner search opens in the live app' },
+    catalog: {
+      kind: 'hotel',
+      unit: 'per night',
+      items: [
+        { id: 'ht-nusantara', title: 'Nusantara Hotels · Seminyak', detail: 'Deluxe room · 19 – 23 Sep · breakfast included', price: 1150000, miles: 600, tag: 'Earns miles' },
+        { id: 'ht-ubud', title: 'Tegal Sari Villas · Ubud', detail: 'Pool villa · 19 – 23 Sep', price: 1680000, miles: 800 },
+        { id: 'ht-harbour', title: 'Harbour Suites · Singapore', detail: 'Marina view · 3 – 6 Oct', price: 2400000, miles: 900 },
+      ],
+    },
   },
   'contact-us': {
     intro: 'We are here around the clock. Choose the channel that suits you.',
@@ -200,7 +253,6 @@ export const FEATURE_CONTENT: Record<string, FeatureContent> = {
     highlights: [
       { title: 'PM8V3K · GA 654 Jakarta → Makassar', description: 'Refund approved · Rp 2,347,000 · arriving within 14 working days' },
     ],
-    sections: [{ title: 'Timeline', items: ['24 Jul · Cancellation received', '25 Jul · Refund approved', 'Est. 7 Aug · Funds returned to Visa •••• 4821'] }],
     cta: { label: 'Request a new refund', to: '/trips' },
   },
   'saved-passengers': {

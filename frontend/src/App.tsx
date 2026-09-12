@@ -23,6 +23,7 @@ import { MilesPage } from './pages/MilesPage'
 import { MilesBenefitsPage } from './pages/MilesBenefitsPage'
 import { PassportPage } from './pages/PassportPage'
 import { MilesActivityPage } from './pages/MilesActivityPage'
+import { MilesRewardsPage } from './pages/MilesRewardsPage'
 import { MorePage } from './pages/MorePage'
 import { FeaturePage } from './pages/FeaturePage'
 import { NotificationsPage } from './pages/NotificationsPage'
@@ -73,6 +74,7 @@ export default function App() {
             <Route path="/miles/benefits" element={<MilesBenefitsPage />} />
             <Route path="/miles/passport" element={<PassportPage />} />
             <Route path="/miles/activity" element={<MilesActivityPage />} />
+            <Route path="/miles/rewards" element={<MilesRewardsPage />} />
 
             <Route path="/more" element={<MorePage />} />
             <Route path="/more/:slug" element={<FeaturePage />} />

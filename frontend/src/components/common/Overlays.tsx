@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { cn } from '../../utils/cn'
@@ -24,9 +24,17 @@ function useEscape(open: boolean, onClose: () => void) {
   }, [open, onClose])
 }
 
-/** Overlay root is the phone frame so sheets/modals stay inside the mobile viewport. */
-function overlayRoot(): HTMLElement {
-  return document.getElementById('app-frame') ?? document.body
+/**
+ * Overlay root is the phone frame so sheets/modals stay inside the mobile viewport.
+ * Resolved after mount so an overlay that is open on first render doesn't get portalled
+ * into <body> and then re-mounted (which would drop focus from its inputs).
+ */
+function useOverlayRoot(): HTMLElement | null {
+  const [root, setRoot] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    setRoot(document.getElementById('app-frame') ?? document.body)
+  }, [])
+  return root
 }
 
 export function BottomSheet({
@@ -51,7 +59,8 @@ export function BottomSheet({
   useLockScroll(open)
   useEscape(open, onClose)
   const panelRef = useRef<HTMLDivElement>(null)
-  if (!open) return null
+  const root = useOverlayRoot()
+  if (!open || !root) return null
 
   return createPortal(
     <div className="absolute inset-0 z-50 flex flex-col justify-end" role="dialog" aria-modal="true" aria-label={title}>
@@ -84,7 +93,7 @@ export function BottomSheet({
         {footer && <div className="px-5 py-3 border-t border-surface-line bg-white">{footer}</div>}
       </div>
     </div>,
-    overlayRoot(),
+    root,
   )
 }
 
@@ -107,7 +116,8 @@ export function Modal({
 }) {
   useLockScroll(open)
   useEscape(open, dismissible ? onClose : () => undefined)
-  if (!open) return null
+  const root = useOverlayRoot()
+  if (!open || !root) return null
   return createPortal(
     <div className="absolute inset-0 z-50 flex items-center justify-center p-5" role="dialog" aria-modal="true" aria-label={title}>
       <button type="button" aria-label="Close" onClick={dismissible ? onClose : undefined} className="absolute inset-0 bg-ink/45 animate-fade-in cursor-default" />
@@ -126,6 +136,6 @@ export function Modal({
         {footer && <div className="px-5 pb-5">{footer}</div>}
       </div>
     </div>,
-    overlayRoot(),
+    root,
   )
 }

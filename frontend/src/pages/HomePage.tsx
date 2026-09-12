@@ -33,7 +33,6 @@ import { RouteLine, TripMiniCard } from '../components/trips/TripCard'
 import { SearchForm } from '../components/booking/SearchForm'
 import { VALUE_ITEMS } from '../data/flights'
 import { DESTINATIONS, OFFERS } from '../data/offers'
-import { MILES_SUMMARY } from '../data/miles'
 import { nextActionFor } from '../data/trips'
 import { cityOf } from '../data/airports'
 import { useApp } from '../store/AppContext'
@@ -292,9 +291,8 @@ function ExploreSection() {
 }
 
 function GuestHome() {
-  const { isMember } = useApp()
+  const { isMember, miles, dispatch } = useApp()
   const navigate = useNavigate()
-  const { dispatch } = useApp()
   const online = useOnline()
   return (
     <>
@@ -361,17 +359,17 @@ function GuestHome() {
         </section>
 
         {isMember ? (
-          <section className="card p-4">
+          <button type="button" onClick={() => navigate('/miles')} className="w-full card p-4 text-left press">
             <div className="flex items-center justify-between mb-2">
               <span className="t-label">GarudaMiles</span>
-              <span className="text-[12px] font-semibold text-brand-blue">Silver</span>
+              <span className="text-[12px] font-semibold text-brand-blue">{miles.tier.name}</span>
             </div>
-            <p className="text-[22px] font-bold text-ink tracking-tight">{formatNumber(MILES_SUMMARY.balance)} miles</p>
-            <ProgressBar value={MILES_SUMMARY.tierMiles} max={MILES_SUMMARY.tierTarget} className="mt-3" label="Tier progress" />
+            <p className="text-[22px] font-bold text-ink tracking-tight">{formatNumber(miles.balance)} miles</p>
+            <ProgressBar value={miles.progressPct} max={100} className="mt-3" label="Tier progress" />
             <p className="text-[12px] text-ink-muted mt-1.5">
-              {formatNumber(MILES_SUMMARY.tierMiles)} / {formatNumber(MILES_SUMMARY.tierTarget)} tier miles to Gold
+              {miles.nextTier ? `${formatNumber(miles.milesToNextTier)} tier miles to ${miles.nextTier.name}` : 'Top tier reached'}
             </p>
-          </section>
+          </button>
         ) : (
           <MascotBanner
             mascot="love"

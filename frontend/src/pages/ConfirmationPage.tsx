@@ -9,6 +9,8 @@ import { useToast } from '../components/common/Toast'
 import { useApp } from '../store/AppContext'
 import { formatLongDate, formatRupiah } from '../utils/format'
 import { cityOf } from '../data/airports'
+import { downloadTripICS, itineraryText } from '../utils/ics'
+import { shareText } from '../utils/share'
 
 export function ConfirmationPage() {
   const { tripId } = useParams()
@@ -81,10 +83,20 @@ export function ConfirmationPage() {
         </section>
 
         <div className="flex gap-2">
-          <Button variant="secondary" full leftIcon={<CalendarPlus className="h-4 w-4" />} onClick={() => toast('Added to your calendar')}>
+          <Button variant="secondary" full leftIcon={<CalendarPlus className="h-4 w-4" />} onClick={() => { downloadTripICS(trip); toast('Calendar event downloaded (.ics) · open it to add') }}>
             Add to Calendar
           </Button>
-          <Button variant="secondary" full leftIcon={<Share2 className="h-4 w-4" />} onClick={() => toast('Itinerary link copied')}>
+          <Button
+            variant="secondary"
+            full
+            leftIcon={<Share2 className="h-4 w-4" />}
+            onClick={async () => {
+              const r = await shareText({ title: `${trip.flightNumber} · ${trip.origin} → ${trip.destination}`, text: itineraryText(trip) })
+              if (r === 'shared') toast('Itinerary shared')
+              else if (r === 'copied') toast('Itinerary copied to clipboard')
+              else if (r === 'failed') toast('Could not share on this device', 'warning')
+            }}
+          >
             Share Itinerary
           </Button>
         </div>

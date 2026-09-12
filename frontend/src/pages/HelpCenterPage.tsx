@@ -5,7 +5,7 @@ import { AppHeader } from '../components/common/AppHeader'
 import { PageContainer, SectionHeader } from '../components/common/Layout'
 import { Input } from '../components/common/Inputs'
 import { Button } from '../components/common/Button'
-import { useToast } from '../components/common/Toast'
+import { SupportChat } from '../components/common/SupportChat'
 import { cn } from '../utils/cn'
 
 const FAQS = [
@@ -19,7 +19,7 @@ const FAQS = [
 
 export function HelpCenterPage() {
   const navigate = useNavigate()
-  const toast = useToast()
+  const [chat, setChat] = useState(false)
   const [q, setQ] = useState('')
   const [open, setOpen] = useState<number | null>(0)
   const list = useMemo(() => {
@@ -34,12 +34,12 @@ export function HelpCenterPage() {
         <Input leftIcon={Search} placeholder="Search help topics" aria-label="Search help topics" value={q} onChange={(e) => setQ(e.target.value)} />
 
         <div className="grid grid-cols-2 gap-2">
-          <Button variant="secondary" leftIcon={<MessageCircle className="h-4 w-4" />} onClick={() => toast('Chat with Garuda opens in the live app · reply in ~2 min', 'info')}>
+          <Button variant="secondary" leftIcon={<MessageCircle className="h-4 w-4" />} onClick={() => setChat(true)}>
             Chat with us
           </Button>
-          <Button variant="secondary" leftIcon={<Phone className="h-4 w-4" />} onClick={() => toast('Calling +62 21 2351 9999', 'info')}>
-            Call centre
-          </Button>
+          <a href="tel:+622123519999" className="inline-flex items-center justify-center gap-2 h-11 px-4 rounded-xl text-[14px] font-semibold bg-white text-brand-navy border border-surface-line hover:bg-surface-off press">
+            <Phone className="h-4 w-4" /> Call centre
+          </a>
         </div>
 
         <section>
@@ -71,6 +71,7 @@ export function HelpCenterPage() {
           </span>
         </button>
       </PageContainer>
+      <SupportChat open={chat} onClose={() => setChat(false)} />
     </div>
   )
 }

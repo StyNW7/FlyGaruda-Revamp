@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowRight, Check, Globe, Heart, Luggage, ShieldCheck, Smartphone, Trash2 } from 'lucide-react'
+import { ArrowRight, Check, Heart, Luggage } from 'lucide-react'
 import { AppHeader } from '../components/common/AppHeader'
 import { PageContainer } from '../components/common/Layout'
 import { Button } from '../components/common/Button'
-import { Toggle } from '../components/common/Inputs'
 import { EmptyState } from '../components/common/States'
 import { DestinationCard } from '../components/common/Explore'
-import { useToast } from '../components/common/Toast'
+import { ServiceCatalog } from '../components/features/ServiceCatalog'
+import { BidUpgrade, TripService } from '../components/features/TripServices'
+import { PaymentMethods, SavedPassengers, SettingsToggles } from '../components/features/AccountFeatures'
+import { CargoTracking, CharterQuote, ContactUs, ELibrary, Feedback, LostAndFound, Refunds, TravelDocsCheck } from '../components/features/SupportFeatures'
 import { findFeature } from '../data/more'
 import { FEATURE_CONTENT } from '../data/featureContent'
 import { DESTINATIONS } from '../data/offers'
@@ -47,82 +49,6 @@ function BaggageCalculator() {
   )
 }
 
-function SettingsToggles({ kind }: { kind: 'notifications' | 'settings' | 'privacy' | 'language' }) {
-  const { state, dispatch } = useApp()
-  const toast = useToast()
-  const [local, setLocal] = useState<Record<string, boolean>>({ biometrics: true, analytics: false, location: true, darkMode: false, haptics: true })
-  const set = (k: string, v: boolean) => setLocal((l) => ({ ...l, [k]: v }))
-  if (kind === 'language') {
-    return (
-      <section className="card divide-y divide-surface-line overflow-hidden">
-        {[
-          { id: 'en', label: 'English', note: 'Default' },
-          { id: 'id', label: 'Bahasa Indonesia', note: 'Tersedia' },
-        ].map((l) => (
-          <button key={l.id} type="button" onClick={() => { dispatch({ type: 'SET_LANGUAGE', value: l.id as 'en' | 'id' }); toast(l.id === 'id' ? 'Bahasa dipilih: Bahasa Indonesia (prototype shows English copy)' : 'Language set to English', 'info') }} className="w-full flex items-center gap-3 px-4 py-3.5 text-left tap">
-            <Globe className="h-5 w-5 text-brand-navy" />
-            <span className="flex-1">
-              <span className="block text-[14px] font-semibold text-ink">{l.label}</span>
-              <span className="block text-[12px] text-ink-muted">{l.note}</span>
-            </span>
-            {state.language === l.id && <Check className="h-5 w-5 text-brand-turquoise" />}
-          </button>
-        ))}
-      </section>
-    )
-  }
-  if (kind === 'notifications') {
-    const rows = [
-      { key: 'checkin', label: 'Check-in reminders', description: 'When online check-in opens for your flight' },
-      { key: 'gate', label: 'Gate & schedule changes', description: 'Instant alerts for any change to your journey' },
-      { key: 'boarding', label: 'Boarding reminders', description: '35 minutes before boarding begins' },
-      { key: 'miles', label: 'GarudaMiles updates', description: 'Miles credited, tier progress and rewards' },
-      { key: 'promo', label: 'Offers & inspiration', description: 'Occasional destination offers' },
-      { key: 'whatsapp', label: 'WhatsApp journey updates', description: 'Receive the same reminders on WhatsApp' },
-    ]
-    return (
-      <section className="card divide-y divide-surface-line overflow-hidden">
-        {rows.map((r) => (
-          <div key={r.key} className="px-4 py-3.5">
-            <Toggle label={r.label} description={r.description} checked={r.key === 'whatsapp' ? state.whatsappOptIn : state.notificationPrefs[r.key] ?? true} onChange={(v) => (r.key === 'whatsapp' ? dispatch({ type: 'SET_WHATSAPP', value: v }) : dispatch({ type: 'SET_NOTIFICATION_PREF', key: r.key, value: v }))} />
-          </div>
-        ))}
-      </section>
-    )
-  }
-  if (kind === 'privacy') {
-    return (
-      <section className="card divide-y divide-surface-line overflow-hidden">
-        <div className="px-4 py-3.5"><Toggle label="Biometric sign-in" description="Face ID / fingerprint" checked={local.biometrics} onChange={(v) => set('biometrics', v)} /></div>
-        <div className="px-4 py-3.5"><Toggle label="Location for airport guidance" description="Used only for arrival recommendations" checked={local.location} onChange={(v) => set('location', v)} /></div>
-        <div className="px-4 py-3.5"><Toggle label="Share usage analytics" description="Help improve FlyGaruda" checked={local.analytics} onChange={(v) => set('analytics', v)} /></div>
-        <button type="button" onClick={() => toast('Password reset link sent to your email', 'info')} className="w-full flex items-center gap-3 px-4 py-3.5 text-left tap">
-          <ShieldCheck className="h-5 w-5 text-brand-navy" />
-          <span className="flex-1 text-[14px] font-semibold text-ink">Change password</span>
-          <ArrowRight className="h-4 w-4 text-ink-faint" />
-        </button>
-        <button type="button" onClick={() => toast('2 active devices · iPhone 15, Chrome on Windows', 'info')} className="w-full flex items-center gap-3 px-4 py-3.5 text-left tap">
-          <Smartphone className="h-5 w-5 text-brand-navy" />
-          <span className="flex-1 text-[14px] font-semibold text-ink">Signed-in devices</span>
-          <ArrowRight className="h-4 w-4 text-ink-faint" />
-        </button>
-        <button type="button" onClick={() => toast('Data export will be emailed within 24 hours', 'info')} className="w-full flex items-center gap-3 px-4 py-3.5 text-left tap">
-          <Trash2 className="h-5 w-5 text-error" />
-          <span className="flex-1 text-[14px] font-semibold text-error">Export or delete my data</span>
-          <ArrowRight className="h-4 w-4 text-ink-faint" />
-        </button>
-      </section>
-    )
-  }
-  return (
-    <section className="card divide-y divide-surface-line overflow-hidden">
-      <div className="px-4 py-3.5"><Toggle label="Haptic feedback" description="Subtle vibration on key actions" checked={local.haptics} onChange={(v) => set('haptics', v)} /></div>
-      <div className="px-4 py-3.5"><Toggle label="Dark appearance" description="Coming soon in this prototype" checked={local.darkMode} onChange={(v) => { set('darkMode', v); toast('Dark appearance is planned for a later release', 'info') }} /></div>
-      <div className="px-4 py-3.5"><Toggle label="Offline boarding pass" description="Keep passes available without connection" checked onChange={() => toast('Boarding passes are always cached offline', 'info')} /></div>
-    </section>
-  )
-}
-
 function Wishlist() {
   const { state, dispatch } = useApp()
   const navigate = useNavigate()
@@ -137,10 +63,59 @@ function Wishlist() {
   )
 }
 
+/** Slugs whose main interaction is a purpose-built component (the generic content is rendered around it). */
+function customFor(slug: string) {
+  switch (slug) {
+    case 'excess-baggage-calculator':
+      return <BaggageCalculator />
+    case 'notifications':
+      return <SettingsToggles kind="notifications" />
+    case 'settings':
+      return <SettingsToggles kind="settings" />
+    case 'privacy-security':
+      return <SettingsToggles kind="privacy" />
+    case 'language':
+      return <SettingsToggles kind="language" />
+    case 'wishlist':
+      return <Wishlist />
+    case 'bid-upgrade':
+      return <BidUpgrade />
+    case 'lounge':
+      return <TripService kind="lounge" />
+    case 'carbon-offset':
+      return <TripService kind="offset" />
+    case 'saved-passengers':
+      return <SavedPassengers />
+    case 'payment-methods':
+      return <PaymentMethods />
+    case 'feedback':
+      return <Feedback />
+    case 'lost-and-found':
+      return <LostAndFound />
+    case 'refund-request':
+      return <Refunds />
+    case 'contact-us':
+      return <ContactUs />
+    case 'charter':
+      return <CharterQuote />
+    case 'kirimaja':
+      return <CargoTracking />
+    case 'travel-docs':
+      return <TravelDocsCheck />
+    case 'e-library':
+      return <ELibrary />
+    default:
+      return null
+  }
+}
+
+/** Slugs where the custom component replaces the generic highlights/CTA (they would duplicate it). */
+const REPLACES_CONTENT = new Set(['bid-upgrade', 'lounge', 'carbon-offset', 'saved-passengers', 'payment-methods', 'feedback', 'lost-and-found', 'refund-request', 'contact-us', 'charter', 'kirimaja', 'travel-docs', 'e-library'])
+
 export function FeaturePage() {
   const { slug = '' } = useParams()
   const navigate = useNavigate()
-  const toast = useToast()
+  const { nextTrip } = useApp()
   const feature = findFeature(slug)
   const content = FEATURE_CONTENT[slug]
 
@@ -154,13 +129,10 @@ export function FeaturePage() {
   }
 
   const Icon = feature.icon
-  const custom =
-    slug === 'excess-baggage-calculator' ? <BaggageCalculator /> :
-    slug === 'notifications' ? <SettingsToggles kind="notifications" /> :
-    slug === 'settings' ? <SettingsToggles kind="settings" /> :
-    slug === 'privacy-security' ? <SettingsToggles kind="privacy" /> :
-    slug === 'language' ? <SettingsToggles kind="language" /> :
-    slug === 'wishlist' ? <Wishlist /> : null
+  const custom = customFor(slug)
+  const catalog = content?.catalog
+  const showGeneric = !REPLACES_CONTENT.has(slug) && !catalog
+  const ctaTarget = content?.cta?.to === '/trips' && nextTrip && slug === 'add-on' ? `/manage/${nextTrip.id}` : content?.cta?.to
 
   return (
     <div className="flex-1 flex flex-col bg-surface-off">
@@ -178,7 +150,9 @@ export function FeaturePage() {
 
         {custom}
 
-        {content?.highlights && (
+        {catalog && <ServiceCatalog kind={catalog.kind} items={catalog.items} unit={catalog.unit} />}
+
+        {showGeneric && content?.highlights && (
           <section className="card divide-y divide-surface-line overflow-hidden">
             {content.highlights.map((h) => (
               <div key={h.title} className="px-4 py-3.5 flex items-start gap-3">
@@ -208,8 +182,8 @@ export function FeaturePage() {
 
         {content?.note && <p className="text-[11.5px] text-ink-faint px-1">{content.note}</p>}
 
-        {content?.cta && (
-          <Button full size="lg" onClick={() => (content.cta?.to ? navigate(content.cta.to) : toast(content.cta?.message ?? 'Done', 'info'))} rightIcon={<ArrowRight className="h-4 w-4" />}>
+        {showGeneric && !catalog && content?.cta && ctaTarget && (
+          <Button full size="lg" onClick={() => navigate(ctaTarget)} rightIcon={<ArrowRight className="h-4 w-4" />}>
             {content.cta.label}
           </Button>
         )}

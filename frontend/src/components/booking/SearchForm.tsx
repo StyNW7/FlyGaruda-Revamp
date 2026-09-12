@@ -9,6 +9,7 @@ import { FieldRow } from '../common/Inputs'
 import { AirportSheet, DateSheet, PassengerSheet } from './Sheets'
 import { passengerLabel } from '../../utils/passengers'
 import { formatMediumDate, addDays } from '../../utils/format'
+import { PROMO_CODES } from '../../data/miles'
 import { cn } from '../../utils/cn'
 
 type SheetKey = 'origin' | 'destination' | 'depart' | 'return' | 'passengers' | null
@@ -24,8 +25,9 @@ export function SearchForm({ compact, className }: { compact?: boolean; classNam
   const navigate = useNavigate()
   const s = state.search
   const [sheet, setSheet] = useState<SheetKey>(null)
-  const [promo, setPromo] = useState(false)
+  const [promo, setPromo] = useState(Boolean(s.promoCode))
   const [promoCode, setPromoCode] = useState(s.promoCode ?? '')
+  const promoInfo = promoCode.trim() ? PROMO_CODES[promoCode.trim().toUpperCase()] : undefined
   const [secondLeg, setSecondLeg] = useState<{ origin: AirportCode; destination: AirportCode }>({ origin: 'DPS', destination: 'SUB' })
 
   const set = (patch: Partial<typeof s>) => dispatch({ type: 'SET_SEARCH', search: patch })
@@ -101,19 +103,26 @@ export function SearchForm({ compact, className }: { compact?: boolean; classNam
 
       <div className="mx-4 border-t border-surface-line" />
       {promo ? (
-        <div className="px-4 py-3 flex items-center gap-2">
-          <Tag className="h-4 w-4 text-ink-faint" />
-          <input
-            value={promoCode}
-            onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-            placeholder="Enter promo code"
-            aria-label="Promo code"
-            className="flex-1 bg-transparent outline-none text-[14px] font-semibold uppercase placeholder:font-medium placeholder:normal-case placeholder:text-ink-faint"
-            autoFocus
-          />
-          <button type="button" onClick={() => { setPromo(false); setPromoCode('') }} className="text-[12px] font-semibold text-ink-muted">
-            Remove
-          </button>
+        <div className="px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Tag className={cn('h-4 w-4', promoInfo ? 'text-success' : 'text-ink-faint')} />
+            <input
+              value={promoCode}
+              onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+              placeholder="Enter promo code"
+              aria-label="Promo code"
+              className="flex-1 bg-transparent outline-none text-[14px] font-semibold uppercase placeholder:font-medium placeholder:normal-case placeholder:text-ink-faint"
+              autoFocus={!s.promoCode}
+            />
+            <button type="button" onClick={() => { setPromo(false); setPromoCode(''); set({ promoCode: undefined }) }} className="text-[12px] font-semibold text-ink-muted">
+              Remove
+            </button>
+          </div>
+          {promoCode.trim() && (
+            <p className={cn('text-[11.5px] mt-1 pl-6', promoInfo ? 'text-success font-semibold' : 'text-ink-muted')}>
+              {promoInfo ? `${promoInfo.label} · applied at checkout` : 'Code will be validated at checkout · try GARUDA10, BALI15 or MILES2026'}
+            </p>
+          )}
         </div>
       ) : (
         <button type="button" onClick={() => setPromo(true)} className="w-full px-4 py-3 flex items-center gap-2 text-[13px] text-ink-soft tap">

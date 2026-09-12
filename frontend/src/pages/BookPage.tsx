@@ -48,7 +48,7 @@ export function BookPage() {
             />
           ))}
           <div className="border-t border-surface-line">
-            <ListRow icon={Ticket} iconTone="blue" title="Retrieve a booking" description="Add a trip using booking code and last name" onClick={() => toast('Use Trips → Add trip to retrieve a booking', 'info')} />
+            <ListRow icon={Ticket} iconTone="blue" title="Retrieve a booking" description="Add a trip using booking code and last name" onClick={() => navigate('/trips?add=1')} />
           </div>
         </section>
 

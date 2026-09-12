@@ -25,7 +25,22 @@ Open the printed local URL. The app renders as a centered mobile viewport on des
 | Email    | demo@flygaruda.app    |
 | Password | FlyGaruda2026         |
 
-All data is mock data stored in `localStorage`. No backend or real APIs are used.
+All data is mock data stored in `localStorage`. No backend or real APIs are used — but every
+button does something real inside the prototype (state changes, generated files, native share).
+
+## Things you can actually do
+
+| Feature | What really happens |
+| --- | --- |
+| **Share Garuda Passport** | Renders a real 1080 × 1920 PNG (Instagram-story size) on a canvas — choose a theme, preview it, **Save image** downloads it, **Share** opens the native share sheet. |
+| **Boarding pass → Share / Wallet** | Same: a real PNG of the pass is generated and saved. |
+| **Add to Calendar** | Downloads a standards-compliant `.ics` event (works with Google / Apple / Outlook). |
+| **Share itinerary** | Native share sheet, or copies the itinerary to the clipboard. |
+| **GarudaMiles** | Redeeming deducts miles, issues a voucher (My Rewards) with a code + QR; vouchers can be applied to a trip. Completing a journey credits miles + tier bonus. Claim missing miles, export a CSV statement, miles calculator. |
+| **Checkout** | Promo codes `GARUDA10`, `BALI15`, `MILES2026` apply a real discount; **Cash + Miles** lets you pay part of the fare with miles (slider). |
+| **Trips → Add trip** | Retrieve demo bookings `KD7P2Q` (Wijaya) and `BX3W8N` (Anggraini). |
+| **More menu** | BidUpgrade, lounge, carbon offset, airport transfer, car rental, roaming, hotels, experiences, GarudaShop, feedback, lost & found, refunds, charter quotes, KirimAja tracking, travel-document check, saved passengers, payment methods, privacy (password, devices, data export as JSON). All persist. |
+| **Support** | In-app chat assistant with deep links; WhatsApp / phone / email open real `wa.me`, `tel:` and `mailto:` links. |
 
 ## Main demo path
 

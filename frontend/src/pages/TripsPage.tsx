@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { HandCoins, Plus, Search } from 'lucide-react'
 import { AppHeader } from '../components/common/AppHeader'
 import { PageContainer } from '../components/common/Layout'
@@ -14,18 +14,30 @@ import { useApp } from '../store/AppContext'
 import { useOnline } from '../hooks/useOnline'
 import { useSimulatedLoading } from '../hooks/useSimulatedLoading'
 import type { TripCategory } from '../types'
+import { RETRIEVABLE_BOOKINGS } from '../data/user'
+import { formatMediumDate } from '../utils/format'
 
 export function TripsPage() {
-  const { state, isMember } = useApp()
+  const { state, isMember, dispatch } = useApp()
   const navigate = useNavigate()
   const toast = useToast()
   const online = useOnline()
+  const [params, setParams] = useSearchParams()
   const [tab, setTab] = useState<TripCategory>('upcoming')
   const [add, setAdd] = useState(false)
   const [pnr, setPnr] = useState('')
   const [lastName, setLastName] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [retrieving, setRetrieving] = useState(false)
   const [query, setQuery] = useState('')
   const loading = useSimulatedLoading(600, [isMember])
+
+  useEffect(() => {
+    if (params.get('add') === '1') {
+      setAdd(true)
+      setParams({}, { replace: true })
+    }
+  }, [params, setParams])
 
   const trips = isMember ? state.trips : []
   const filtered = trips
@@ -42,11 +54,44 @@ export function TripsPage() {
     cancelled: trips.filter((t) => t.category === 'cancelled').length,
   }
 
-  const retrieve = () => {
+  const closeAdd = () => {
     setAdd(false)
-    toast(pnr.trim() ? `Booking ${pnr.toUpperCase()} would be retrieved in the live app` : 'Enter a booking code', pnr.trim() ? 'info' : 'warning')
     setPnr('')
     setLastName('')
+    setError(null)
+  }
+
+  /** Looks the booking up by code + last name — first in the account, then in bookings made outside the app. */
+  const retrieve = () => {
+    const code = pnr.trim().toUpperCase()
+    const name = lastName.trim().toUpperCase()
+    if (code.length !== 6) return setError('Booking codes are 6 characters, e.g. KD7P2Q.')
+    if (!name) return setError('Enter the passenger last name as on the booking.')
+    setError(null)
+    setRetrieving(true)
+    window.setTimeout(() => {
+      setRetrieving(false)
+      const existing = state.trips.find((t) => t.bookingCode === code)
+      if (existing) {
+        if (!existing.passengerName.toUpperCase().includes(name)) return setError('That last name does not match this booking.')
+        closeAdd()
+        toast(`${code} is already in your trips`, 'info')
+        navigate(`/trips/${existing.id}`)
+        return
+      }
+      const found = RETRIEVABLE_BOOKINGS.find((b) => b.code === code)
+      if (!found) return setError('No booking found with that code. Check the confirmation email and try again.')
+      if (found.lastName !== name) return setError('That last name does not match this booking.')
+      if (!isMember) dispatch({ type: 'LOGIN', auth: 'member' })
+      dispatch({ type: 'ADD_TRIP', trip: found.trip })
+      dispatch({
+        type: 'ADD_NOTIFICATION',
+        notification: { id: `retrieved-${found.trip.id}`, category: 'travel', title: `Trip added · ${found.trip.flightNumber} on ${formatMediumDate(found.trip.date)}`, body: `${found.trip.origin} → ${found.trip.destination} for ${found.trip.passengerName}. Journey Companion is now active for this trip.`, time: 'Just now', to: `/trips/${found.trip.id}`, iconKey: 'ticket' },
+      })
+      closeAdd()
+      setTab('upcoming')
+      toast(`Booking ${code} added to your trips`)
+    }, 900)
   }
 
   return (
@@ -124,19 +169,30 @@ export function TripsPage() {
 
       <BottomSheet
         open={add}
-        onClose={() => setAdd(false)}
+        onClose={closeAdd}
         title="Add a trip"
         subtitle="Retrieve a booking made elsewhere"
         footer={
-          <Button full onClick={retrieve}>
+          <Button full loading={retrieving} onClick={retrieve}>
             Retrieve booking
           </Button>
         }
       >
         <div className="space-y-3.5 pt-1">
-          <Input label="Booking code" placeholder="e.g. RW9K2A" value={pnr} onChange={(e) => setPnr(e.target.value.toUpperCase())} className="font-mono" maxLength={6} />
-          <Input label="Passenger last name" placeholder="As on the booking" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+          <Input label="Booking code" placeholder="e.g. KD7P2Q" value={pnr} onChange={(e) => { setPnr(e.target.value.toUpperCase()); setError(null) }} className="font-mono" maxLength={6} error={error ?? undefined} />
+          <Input label="Passenger last name" placeholder="As on the booking" value={lastName} onChange={(e) => { setLastName(e.target.value); setError(null) }} autoComplete="family-name" />
           <p className="text-[11.5px] text-ink-faint">Bookings from garuda-indonesia.com, travel agents and partners can be added here.</p>
+          <div className="rounded-xl border border-dashed border-brand-turquoise/40 bg-brand-turquoise-soft/50 p-3">
+            <p className="text-[12px] font-bold text-ink">Demo bookings to try</p>
+            <div className="mt-2 space-y-1.5">
+              {RETRIEVABLE_BOOKINGS.map((b) => (
+                <button key={b.code} type="button" onClick={() => { setPnr(b.code); setLastName(b.lastName.charAt(0) + b.lastName.slice(1).toLowerCase()); setError(null) }} className="w-full flex items-center justify-between text-left text-[12px] rounded-lg bg-white border border-surface-line px-3 py-2 tap">
+                  <span className="font-mono font-semibold text-ink tracking-wider">{b.code}</span>
+                  <span className="text-ink-muted">{b.trip.flightNumber} · {b.trip.origin} → {b.trip.destination} · {b.lastName.charAt(0) + b.lastName.slice(1).toLowerCase()}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </BottomSheet>
     </div>
