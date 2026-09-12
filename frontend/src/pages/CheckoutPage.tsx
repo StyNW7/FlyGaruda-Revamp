@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Armchair, ArrowRight, Check, CreditCard, Landmark, Lock, QrCode, ShieldCheck, User, Wallet, Award, ChevronDown } from 'lucide-react'
+import { Armchair, ArrowRight, Award, Baby, Check, ChevronDown, CreditCard, Landmark, Lock, QrCode, ShieldCheck, User, Wallet } from 'lucide-react'
 import { AppHeader } from '../components/common/AppHeader'
 import { PageContainer, StickyCTA } from '../components/common/Layout'
 import { Button } from '../components/common/Button'
@@ -13,10 +13,10 @@ import { PAYMENT_METHODS, SAVED_PASSENGERS } from '../data/user'
 import { getAirport } from '../data/airports'
 import { useApp } from '../store/AppContext'
 import { addMinutes, formatMediumDate, formatRupiah, generateBookingCode } from '../utils/format'
-import type { Trip } from '../types'
+import type { DraftPassenger, Flight, Trip } from '../types'
 import { cn } from '../utils/cn'
 
-const STEPS = ['Passenger', 'Seat & add-ons', 'Payment'] as const
+const STEPS = ['Passengers', 'Seat & add-ons', 'Payment'] as const
 
 function StepHeader({ step }: { step: number }) {
   return (
@@ -26,12 +26,7 @@ function StepHeader({ step }: { step: number }) {
         const active = i === step
         return (
           <li key={label} className="flex items-center gap-2 flex-1 min-w-0">
-            <span
-              className={cn(
-                'h-6 w-6 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0',
-                done ? 'bg-brand-turquoise text-white' : active ? 'bg-brand-navy text-white' : 'bg-surface-soft text-ink-muted',
-              )}
-            >
+            <span className={cn('h-6 w-6 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0', done ? 'bg-brand-turquoise text-white' : active ? 'bg-brand-navy text-white' : 'bg-surface-soft text-ink-muted')}>
               {done ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : i + 1}
             </span>
             <span className={cn('text-[12px] font-semibold truncate', active ? 'text-ink' : 'text-ink-muted')}>{label}</span>
@@ -44,119 +39,120 @@ function StepHeader({ step }: { step: number }) {
 }
 
 const PAY_ICONS = { card: CreditCard, transfer: Landmark, qris: QrCode, wallet: Wallet, miles: Award }
+const TYPE_LABEL = { adult: 'Adult', child: 'Child', infant: 'Infant' }
 
 export function CheckoutPage() {
   const { state, dispatch, isMember } = useApp()
   const navigate = useNavigate()
   const draft = state.draft
-  const flight = draft ? findFlight(draft.flightId) : undefined
+  const legs = useMemo(() => (draft ? draft.legIds.map(findFlight).filter((f): f is Flight => Boolean(f)) : []), [draft])
   const [step, setStep] = useState(0)
   const [seatSheet, setSeatSheet] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [agree, setAgree] = useState(false)
   const [contactOpen, setContactOpen] = useState(!isMember)
-
   const completedRef = useRef(false)
 
   useEffect(() => {
-    if ((!draft || !flight) && !completedRef.current) navigate('/book', { replace: true })
-  }, [draft, flight, navigate])
+    if ((!draft || legs.length === 0) && !completedRef.current) navigate('/book', { replace: true })
+  }, [draft, legs.length, navigate])
 
   const fare = useMemo(() => FARE_FAMILIES.find((f) => f.id === draft?.fareId), [draft?.fareId])
-  if (!draft || !flight || !fare) return null
+  if (!draft || legs.length === 0 || !fare) return null
 
-  const adults = Math.max(1, state.search.passengers.adults + state.search.passengers.children)
-  const farePrice = flight.prices[draft.fareId] * adults
+  const paying = draft.passengers.filter((p) => p.type !== 'infant').length || 1
+  const farePerPax = legs.reduce((sum, f) => sum + f.prices[draft.fareId], 0)
+  const farePrice = farePerPax * paying
   const addOnTotal = draft.addOns.reduce((sum, id) => sum + (ADD_ONS.find((a) => a.id === id)?.price ?? 0), 0)
-  const taxes = Math.round(farePrice * 0.11 / 1000) * 1000
+  const taxes = Math.round((farePrice * 0.11) / 1000) * 1000
   const total = farePrice + addOnTotal + taxes
-  const p = draft.passenger
-  const passengerValid = p.firstName.trim() && p.lastName.trim() && p.email.trim() && p.phone.trim()
+  const passengersValid = draft.passengers.every((p) => p.firstName.trim() && p.lastName.trim()) && draft.contact.email.trim() && draft.contact.phone.trim()
+  const lead = draft.passengers[0]
 
   const update = (patch: Partial<typeof draft>) => dispatch({ type: 'UPDATE_DRAFT', patch })
+  const updatePassenger = (id: string, patch: Partial<DraftPassenger>) => update({ passengers: draft.passengers.map((p) => (p.id === id ? { ...p, ...patch } : p)) })
   const toggleAddOn = (id: string) => update({ addOns: draft.addOns.includes(id) ? draft.addOns.filter((a) => a !== id) : [...draft.addOns, id] })
 
   const pay = () => {
     setProcessing(true)
     window.setTimeout(() => {
-      // Demo storyline: booking a flight that already exists in the account (GA 412 on 19 Sep)
-      // resolves to that booking so the journey continues seamlessly into check-in.
-      const existing = state.trips.find((t) => t.category === 'upcoming' && t.flightNumber === flight.number && t.date === state.search.departDate)
-      if (existing) {
-        completedRef.current = true
-        navigate(`/confirmation/${existing.id}`, { replace: true })
-        dispatch({ type: 'UPDATE_TRIP', id: existing.id, patch: { seat: draft.seat ?? existing.seat, fare: draft.fareId, totalPaid: total, addOns: draft.addOns } })
-        dispatch({ type: 'SET_DRAFT', draft: null })
+      const passengerName = `${lead.firstName} ${lead.lastName}`.trim() + (draft.passengers.length > 1 ? ` +${draft.passengers.length - 1}` : '')
+      const created: Trip[] = []
+      let firstId: string | null = null
+      legs.forEach((flight, index) => {
+        const date = index === 0 ? state.search.departDate : state.search.returnDate
+        // Demo storyline: booking a flight already in the account (GA 412 on 19 Sep) resolves to that booking.
+        const existing = state.trips.find((t) => t.category === 'upcoming' && t.flightNumber === flight.number && t.date === date)
+        if (existing) {
+          dispatch({ type: 'UPDATE_TRIP', id: existing.id, patch: { seat: index === 0 ? (draft.seat ?? existing.seat) : existing.seat, fare: draft.fareId, totalPaid: total, addOns: draft.addOns, passengerCount: draft.passengers.length } })
+          firstId = firstId ?? existing.id
+          return
+        }
+        const id = `trip-${flight.number.replace(' ', '').toLowerCase()}-${Date.now()}-${index}`
+        const trip: Trip = {
+          id,
+          bookingCode: generateBookingCode(id),
+          flightNumber: flight.number,
+          origin: flight.origin,
+          destination: flight.destination,
+          date,
+          departTime: flight.departTime,
+          arriveTime: flight.arriveTime,
+          boardingTime: addMinutes(flight.departTime, -30),
+          terminal: flight.terminal,
+          arrivalTerminal: flight.arrivalTerminal,
+          gate: 'TBA',
+          seat: index === 0 ? draft.seat : null,
+          zone: '3',
+          sequence: String(40 + ((Date.now() + index) % 50)).padStart(3, '0'),
+          aircraft: flight.aircraft,
+          cabin: state.search.cabin,
+          fare: draft.fareId,
+          status: 'scheduled',
+          stage: 'booked',
+          category: 'upcoming',
+          checkedIn: false,
+          checkInOpen: false,
+          passengerName,
+          passengerCount: draft.passengers.length,
+          baggageChecked: draft.addOns.includes('baggage10') ? '30 kg' : '20 kg',
+          baggageCabin: '7 kg',
+          meal: 'Standard meal',
+          milesEstimate: Math.round(flight.milesEarn * (draft.fareId === 'flex' ? 1.5 : draft.fareId === 'value' ? 1.25 : 1)),
+          addOns: draft.addOns,
+          totalPaid: index === 0 ? total : undefined,
+        }
+        created.push(trip)
+        firstId = firstId ?? id
+      })
+      completedRef.current = true
+      navigate(`/confirmation/${firstId}`, { replace: true })
+      created.forEach((trip) => dispatch({ type: 'ADD_TRIP', trip }))
+      dispatch({ type: 'SET_DRAFT', draft: null })
+      const first = created[0] ?? state.trips.find((t) => t.id === firstId)
+      if (first) {
         dispatch({
           type: 'ADD_NOTIFICATION',
           notification: {
-            id: `booking-${existing.id}`,
+            id: `booking-${first.id}`,
             category: 'travel',
-            title: `Booking confirmed · ${existing.bookingCode}`,
-            body: `${existing.flightNumber} ${existing.origin} → ${existing.destination} on ${formatMediumDate(existing.date)}. Online check-in is now available.`,
+            title: `Booking confirmed · ${first.bookingCode}`,
+            body: `${first.flightNumber} ${first.origin} → ${first.destination} on ${formatMediumDate(first.date)}${legs.length > 1 ? ' with return flight' : ''}. ${first.checkInOpen ? 'Online check-in is now available.' : 'We will remind you when check-in opens.'}`,
             time: 'Just now',
-            to: `/trips/${existing.id}`,
+            to: `/trips/${first.id}`,
             iconKey: 'ticket',
           },
         })
-        setProcessing(false)
-        return
       }
-      const id = `trip-${flight.number.replace(' ', '').toLowerCase()}-${Date.now()}`
-      const trip: Trip = {
-        id,
-        bookingCode: generateBookingCode(id),
-        flightNumber: flight.number,
-        origin: flight.origin,
-        destination: flight.destination,
-        date: state.search.departDate,
-        departTime: flight.departTime,
-        arriveTime: flight.arriveTime,
-        boardingTime: addMinutes(flight.departTime, -30),
-        terminal: flight.terminal,
-        arrivalTerminal: flight.arrivalTerminal,
-        gate: 'TBA',
-        seat: draft.seat,
-        zone: '3',
-        sequence: String(40 + (Date.now() % 50)).padStart(3, '0'),
-        aircraft: flight.aircraft,
-        cabin: state.search.cabin,
-        fare: draft.fareId,
-        status: 'scheduled',
-        stage: 'booked',
-        category: 'upcoming',
-        checkedIn: false,
-        checkInOpen: false,
-        passengerName: `${p.firstName} ${p.lastName}`.trim(),
-        baggageChecked: draft.addOns.includes('baggage10') ? '30 kg' : '20 kg',
-        baggageCabin: '7 kg',
-        meal: 'Standard meal',
-        milesEstimate: Math.round(flight.milesEarn * (draft.fareId === 'flex' ? 1.5 : draft.fareId === 'value' ? 1.25 : 1)),
-        addOns: draft.addOns,
-        totalPaid: total,
-      }
-      completedRef.current = true
-      navigate(`/confirmation/${id}`, { replace: true })
-      dispatch({ type: 'ADD_TRIP', trip })
-      dispatch({
-        type: 'ADD_NOTIFICATION',
-        notification: {
-          id: `booking-${id}`,
-          category: 'travel',
-          title: `Booking confirmed · ${trip.bookingCode}`,
-          body: `${trip.flightNumber} ${trip.origin} → ${trip.destination} on ${formatMediumDate(trip.date)}. We will remind you when check-in opens.`,
-          time: 'Just now',
-          to: `/trips/${id}`,
-          iconKey: 'ticket',
-        },
-      })
       setProcessing(false)
     }, 2200)
   }
 
+  const legLabel = legs.length > 1 ? `${legs[0].number} + ${legs[1].number}` : legs[0].number
+
   return (
     <div className="flex-1 flex flex-col bg-surface-off">
-      <AppHeader back={step === 0 ? true : undefined} title="Checkout" subtitle={`${flight.number} · ${getAirport(flight.origin).code} → ${getAirport(flight.destination).code} · ${fare.name}`} right={step > 0 ? <Button variant="ghost" size="sm" onClick={() => setStep((s) => s - 1)}>Back</Button> : undefined} />
+      <AppHeader back={step === 0 ? true : undefined} title="Checkout" subtitle={`${legLabel} · ${getAirport(legs[0].origin).code} ${legs.length > 1 ? '⇄' : '→'} ${getAirport(legs[0].destination).code} · ${fare.name}`} right={step > 0 ? <Button variant="ghost" size="sm" onClick={() => setStep((s) => s - 1)}>Back</Button> : undefined} />
       <StepHeader step={step} />
 
       <PageContainer className="py-4 space-y-4">
@@ -164,17 +160,20 @@ export function CheckoutPage() {
           <div className="space-y-4 animate-fade-up">
             {isMember && (
               <section>
-                <p className="t-label mb-2">Saved travellers</p>
+                <p className="t-label mb-2">Saved travellers · tap to fill</p>
                 <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4">
                   {SAVED_PASSENGERS.map((sp) => {
                     const [first, ...rest] = sp.name.split(' ')
-                    const active = p.firstName === first && p.lastName === rest.join(' ')
+                    const used = draft.passengers.find((p) => p.firstName === first && p.lastName === rest.join(' '))
                     return (
                       <button
                         key={sp.id}
                         type="button"
-                        onClick={() => update({ passenger: { ...p, firstName: first, lastName: rest.join(' '), milesId: sp.milesId } })}
-                        className={cn('shrink-0 rounded-xl border px-3.5 py-2.5 text-left transition-colors', active ? 'border-brand-blue bg-brand-blue-light/60' : 'border-surface-line bg-white')}
+                        onClick={() => {
+                          const target = draft.passengers.find((p) => !p.firstName.trim()) ?? draft.passengers[0]
+                          updatePassenger(target.id, { firstName: first, lastName: rest.join(' '), milesId: sp.milesId })
+                        }}
+                        className={cn('shrink-0 rounded-xl border px-3.5 py-2.5 text-left transition-colors', used ? 'border-brand-blue bg-brand-blue-light/60' : 'border-surface-line bg-white')}
                       >
                         <span className="block text-[13px] font-semibold text-ink">{sp.name}</span>
                         <span className="block text-[11px] text-ink-muted">{sp.relation}</span>
@@ -185,42 +184,48 @@ export function CheckoutPage() {
               </section>
             )}
 
-            <section className="card p-4 space-y-3.5">
-              <div className="flex items-center gap-2 text-[14px] font-bold text-ink">
-                <User className="h-4 w-4 text-brand-turquoise" /> Passenger 1 · Adult
-              </div>
-              <div className="grid grid-cols-[88px_1fr] gap-3">
-                <div>
-                  <label className="block text-[12px] font-semibold text-ink-soft mb-1.5" htmlFor="title">
-                    Title
-                  </label>
-                  <div className="relative">
-                    <select id="title" value={p.title} onChange={(e) => update({ passenger: { ...p, title: e.target.value } })} className="h-12 w-full appearance-none rounded-xl border border-surface-line bg-white px-3.5 pr-8 text-[15px] focus:border-brand-blue outline-none">
-                      {['Mr', 'Mrs', 'Ms'].map((t) => (
-                        <option key={t}>{t}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="h-4 w-4 text-ink-faint absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  </div>
+            {draft.passengers.map((p, i) => (
+              <section key={p.id} className="card p-4 space-y-3.5">
+                <div className="flex items-center gap-2 text-[14px] font-bold text-ink">
+                  {p.type === 'infant' ? <Baby className="h-4 w-4 text-brand-turquoise" /> : <User className="h-4 w-4 text-brand-turquoise" />}
+                  Passenger {i + 1} · {TYPE_LABEL[p.type]}
+                  {i === 0 && <span className="ml-auto text-[10px] font-bold uppercase tracking-wide rounded-full bg-surface-soft px-2 py-0.5 text-ink-muted">Lead</span>}
                 </div>
-                <Input label="First name" value={p.firstName} onChange={(e) => update({ passenger: { ...p, firstName: e.target.value } })} placeholder="As on ID" autoComplete="given-name" />
-              </div>
-              <Input label="Last name" value={p.lastName} onChange={(e) => update({ passenger: { ...p, lastName: e.target.value } })} placeholder="As on ID" autoComplete="family-name" />
-              <Input label="GarudaMiles number (optional)" value={p.milesId ?? ''} onChange={(e) => update({ passenger: { ...p, milesId: e.target.value } })} placeholder="GA-00000000" hint={`Earn about ${flight.milesEarn.toLocaleString()} miles on this flight`} />
-            </section>
+                <div className="grid grid-cols-[88px_1fr] gap-3">
+                  <div>
+                    <label className="block text-[12px] font-semibold text-ink-soft mb-1.5" htmlFor={`title-${p.id}`}>
+                      Title
+                    </label>
+                    <div className="relative">
+                      <select id={`title-${p.id}`} value={p.title} onChange={(e) => updatePassenger(p.id, { title: e.target.value })} className="h-12 w-full appearance-none rounded-xl border border-surface-line bg-white px-3.5 pr-8 text-[15px] focus:border-brand-blue outline-none">
+                        {(p.type === 'adult' ? ['Mr', 'Mrs', 'Ms'] : ['Mstr', 'Miss']).map((t) => (
+                          <option key={t}>{t}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="h-4 w-4 text-ink-faint absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+                  <Input label="First name" value={p.firstName} onChange={(e) => updatePassenger(p.id, { firstName: e.target.value })} placeholder="As on ID" autoComplete="given-name" />
+                </div>
+                <Input label="Last name" value={p.lastName} onChange={(e) => updatePassenger(p.id, { lastName: e.target.value })} placeholder="As on ID" autoComplete="family-name" />
+                {p.type === 'adult' && (
+                  <Input label="GarudaMiles number (optional)" value={p.milesId ?? ''} onChange={(e) => updatePassenger(p.id, { milesId: e.target.value })} placeholder="GA-00000000" hint={`Earn about ${legs.reduce((s, f) => s + f.milesEarn, 0).toLocaleString()} miles on this booking`} />
+                )}
+              </section>
+            ))}
 
             <section className="card overflow-hidden">
               <button type="button" onClick={() => setContactOpen((o) => !o)} aria-expanded={contactOpen} className="w-full flex items-center justify-between p-4 text-left">
                 <span>
                   <span className="block text-[14px] font-bold text-ink">Contact details</span>
-                  <span className="block text-[12px] text-ink-muted mt-0.5">{p.email || 'Email and phone for your e-ticket'}</span>
+                  <span className="block text-[12px] text-ink-muted mt-0.5">{draft.contact.email || 'Email and phone for your e-ticket'}</span>
                 </span>
                 <ChevronDown className={cn('h-5 w-5 text-ink-muted transition-transform', contactOpen && 'rotate-180')} />
               </button>
               {contactOpen && (
                 <div className="px-4 pb-4 space-y-3.5 animate-fade-in">
-                  <Input label="Email" type="email" value={p.email} onChange={(e) => update({ passenger: { ...p, email: e.target.value } })} placeholder="name@example.com" autoComplete="email" />
-                  <Input label="Mobile number" type="tel" value={p.phone} onChange={(e) => update({ passenger: { ...p, phone: e.target.value } })} placeholder="+62" autoComplete="tel" />
+                  <Input label="Email" type="email" value={draft.contact.email} onChange={(e) => update({ contact: { ...draft.contact, email: e.target.value } })} placeholder="name@example.com" autoComplete="email" />
+                  <Input label="Mobile number" type="tel" value={draft.contact.phone} onChange={(e) => update({ contact: { ...draft.contact, phone: e.target.value } })} placeholder="+62" autoComplete="tel" />
                 </div>
               )}
             </section>
@@ -235,7 +240,7 @@ export function CheckoutPage() {
                   <Armchair className="h-5 w-5" />
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[14px] font-bold text-ink">Seat selection</p>
+                  <p className="text-[14px] font-bold text-ink">Seat selection{legs.length > 1 ? ' · outbound' : ''}</p>
                   <p className="text-[12px] text-ink-muted mt-0.5">
                     {draft.seat ? (
                       <>
@@ -287,12 +292,15 @@ export function CheckoutPage() {
             <section className="card p-4">
               <p className="t-label mb-2">Price summary</p>
               <div className="space-y-1.5 text-[13px]">
-                <div className="flex justify-between">
-                  <span className="text-ink-soft">
-                    {fare.name} × {adults}
-                  </span>
-                  <span className="font-semibold">{formatRupiah(farePrice)}</span>
-                </div>
+                {legs.map((f, i) => (
+                  <div key={f.id} className="flex justify-between">
+                    <span className="text-ink-soft">
+                      {legs.length > 1 ? (i === 0 ? 'Outbound ' : 'Return ') : ''}
+                      {f.number} · {fare.name} × {paying}
+                    </span>
+                    <span className="font-semibold">{formatRupiah(f.prices[draft.fareId] * paying)}</span>
+                  </div>
+                ))}
                 {draft.addOns.map((id) => {
                   const a = ADD_ONS.find((x) => x.id === id)!
                   return (
@@ -317,14 +325,7 @@ export function CheckoutPage() {
               <p className="t-label mb-2">Payment method</p>
               <div className="space-y-2" role="radiogroup" aria-label="Payment method">
                 {PAYMENT_METHODS.map((m) => (
-                  <RadioRow
-                    key={m.id}
-                    icon={PAY_ICONS[m.id as keyof typeof PAY_ICONS]}
-                    checked={draft.paymentMethod === m.id}
-                    onSelect={() => update({ paymentMethod: m.id })}
-                    title={m.label}
-                    description={m.detail}
-                  />
+                  <RadioRow key={m.id} icon={PAY_ICONS[m.id as keyof typeof PAY_ICONS]} checked={draft.paymentMethod === m.id} onSelect={() => update({ paymentMethod: m.id })} title={m.label} description={m.detail} />
                 ))}
               </div>
             </section>
@@ -347,11 +348,14 @@ export function CheckoutPage() {
 
       <StickyCTA>
         <div className="flex-1 min-w-0">
-          <p className="text-[11px] text-ink-muted">Total</p>
+          <p className="text-[11px] text-ink-muted">
+            Total · {paying} passenger{paying > 1 ? 's' : ''}
+            {legs.length > 1 ? ' · round trip' : ''}
+          </p>
           <p className="text-[18px] font-bold text-brand-navy leading-tight">{formatRupiah(total)}</p>
         </div>
         {step < 2 ? (
-          <Button size="lg" className="px-6" disabled={step === 0 && !passengerValid} onClick={() => setStep((s) => s + 1)} rightIcon={<ArrowRight className="h-4 w-4" />}>
+          <Button size="lg" className="px-6" disabled={step === 0 && !passengersValid} onClick={() => setStep((s) => s + 1)} rightIcon={<ArrowRight className="h-4 w-4" />}>
             Continue
           </Button>
         ) : (
@@ -365,7 +369,7 @@ export function CheckoutPage() {
         open={seatSheet}
         onClose={() => setSeatSheet(false)}
         title="Choose your seat"
-        subtitle={`${flight.aircraft} · Economy rows 14 – 25`}
+        subtitle={`${legs[0].number} · ${legs[0].aircraft} · Economy rows 14 – 25`}
         height="full"
         footer={
           <div className="flex items-center gap-3">
@@ -380,7 +384,7 @@ export function CheckoutPage() {
         }
       >
         <SeatLegend />
-        <SeatMap selected={draft.seat} onSelect={(seat) => update({ seat })} seed={flight.number} className="mt-4" />
+        <SeatMap selected={draft.seat} onSelect={(seat) => update({ seat })} seed={legs[0].number} className="mt-4" />
       </BottomSheet>
 
       <Modal open={processing} onClose={() => undefined} dismissible={false}>

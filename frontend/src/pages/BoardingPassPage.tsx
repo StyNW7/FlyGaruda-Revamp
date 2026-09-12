@@ -96,7 +96,16 @@ export function BoardingPassPage() {
           <button type="button" onClick={() => navigate(`/flight-update/${trip.id}`)} className="w-full flex items-center gap-3 rounded-2xl bg-warning-soft border border-warning/30 p-3.5 text-left press">
             <AlertTriangle className="h-5 w-5 text-warning shrink-0" />
             <span className="flex-1 text-[12.5px] text-ink">
-              <span className="font-bold">Updated:</span> delayed {d.delayMin} min · new boarding <span className="font-semibold">{d.newBoardingTime}</span>
+              <span className="font-bold">Updated:</span>{' '}
+              {d.type === 'gate-change' ? (
+                <>
+                  gate changed to <span className="font-semibold">{d.newGate}</span> · boarding {trip.boardingTime} unchanged
+                </>
+              ) : (
+                <>
+                  delayed {d.delayMin} min · new boarding <span className="font-semibold">{d.newBoardingTime}</span>
+                </>
+              )}
             </span>
             <ArrowRight className="h-4 w-4 text-ink-muted" />
           </button>
@@ -114,7 +123,7 @@ export function BoardingPassPage() {
                 <p className="text-[11px] text-white/70">{cityOf(trip.origin)}</p>
                 <p className="text-[34px] font-bold leading-none tracking-tight">{trip.origin}</p>
                 <p className="text-[15px] font-semibold mt-1">
-                  {d && <span className="line-through text-white/50 font-normal mr-1.5">{trip.departTime}</span>}
+                  {dep !== trip.departTime && <span className="line-through text-white/50 font-normal mr-1.5">{trip.departTime}</span>}
                   {dep}
                 </p>
               </div>
@@ -177,8 +186,14 @@ export function BoardingPassPage() {
                 <Radar className="h-5 w-5" />
               </span>
               <span className="flex-1">
-                <span className="block text-[14px] font-semibold text-ink">{d ? `Delayed ${d.delayMin} min · departs ${dep}` : `On time · departs ${dep}`}</span>
-                <span className="block text-[12px] text-ink-muted">{d ? d.reason : 'Aircraft at gate · crew ready'}</span>
+                <span className="flex items-center gap-2 text-[14px] font-semibold text-ink">
+                  <span className="relative flex h-2 w-2">
+                    <span className={cn('absolute inline-flex h-full w-full rounded-full opacity-60 animate-ping', d ? 'bg-warning' : 'bg-success')} />
+                    <span className={cn('relative inline-flex h-2 w-2 rounded-full', d ? 'bg-warning' : 'bg-success')} />
+                  </span>
+                  {d ? (d.type === 'gate-change' ? `Gate ${trip.gate} · departs ${dep}` : `Delayed ${d.delayMin} min · departs ${dep}`) : `On time · departs ${dep}`}
+                </span>
+                <span className="block text-[12px] text-ink-muted">{d ? d.reason : 'Live status · aircraft at gate · crew ready'}</span>
               </span>
             </div>
             <div className="flex items-center gap-3">

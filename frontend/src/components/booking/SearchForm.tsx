@@ -33,7 +33,7 @@ export function SearchForm({ compact, className }: { compact?: boolean; classNam
   const swap = () => set({ origin: s.destination, destination: s.origin })
 
   const submit = () => {
-    set({ promoCode: promoCode.trim() || undefined })
+    set({ promoCode: promoCode.trim() || undefined, outboundFlightId: undefined })
     navigate('/search-results')
   }
 
@@ -91,9 +91,9 @@ export function SearchForm({ compact, className }: { compact?: boolean; classNam
 
       <div className="mx-4 border-t border-surface-line" />
       <div className={cn('grid', s.tripType === 'round' ? 'grid-cols-2' : 'grid-cols-1')}>
-        <FieldRow label="Departure" icon={CalendarDays} value={formatMediumDate(s.departDate)} onClick={() => setSheet('depart')} trailing={<span />} />
+        <FieldRow label="Departure" icon={CalendarDays} value={s.tripType === 'round' ? formatMediumDate(s.departDate).replace(/ \d{4}$/, '') : formatMediumDate(s.departDate)} onClick={() => setSheet('depart')} trailing={<span />} compact={s.tripType === 'round'} />
         {s.tripType === 'round' && (
-          <FieldRow label="Return" icon={CalendarDays} value={formatMediumDate(s.returnDate)} onClick={() => setSheet('return')} trailing={<span />} className="border-l border-surface-line" />
+          <FieldRow label="Return" icon={CalendarDays} value={formatMediumDate(s.returnDate).replace(/ \d{4}$/, '')} onClick={() => setSheet('return')} trailing={<span />} className="border-l border-surface-line" compact />
         )}
       </div>
       <div className="mx-4 border-t border-surface-line" />

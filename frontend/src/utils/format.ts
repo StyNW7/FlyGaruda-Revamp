@@ -132,3 +132,17 @@ export function generateBookingCode(seed: string): string {
   }
   return out
 }
+
+/** Whole days from today (local) until the given ISO date; negative when in the past. */
+export function daysUntil(iso: string, from: Date = new Date()): number {
+  const target = parseISODate(iso).getTime()
+  const today = new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime()
+  return Math.round((target - today) / 86400000)
+}
+
+export function daysLabel(days: number): string {
+  if (days < 0) return 'Completed'
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Tomorrow'
+  return `${days} days to go`
+}

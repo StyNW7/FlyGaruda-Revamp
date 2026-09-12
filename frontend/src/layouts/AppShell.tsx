@@ -71,14 +71,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [pathname])
 
   return (
-    <div className="relative min-h-[100dvh] flex justify-center">
+    <div className="relative min-h-[100dvh] flex justify-center bg-[radial-gradient(ellipse_at_top,_#F3F6FA_0%,_#E9EEF3_60%)]">
       <PresentationPanel />
       <div
         id="app-frame"
         className="relative w-full max-w-[var(--app-max-width)] h-[100dvh] bg-surface-off flex flex-col overflow-hidden md:shadow-[0_0_0_1px_rgba(15,31,61,0.06),0_24px_60px_rgba(15,31,61,0.12)]"
       >
         <div id="app-scroll" className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col">
-          {children}
+          <div key={pathname} className="flex-1 flex flex-col animate-fade-in">
+            {children}
+          </div>
         </div>
         {showNav && <BottomNav />}
       </div>

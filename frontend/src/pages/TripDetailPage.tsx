@@ -36,7 +36,8 @@ import { useSimulatedLoading } from '../hooks/useSimulatedLoading'
 import { nextActionFor, STAGES } from '../data/trips'
 import { FARE_FAMILIES } from '../data/flights'
 import { cityOf, getAirport } from '../data/airports'
-import { formatLongDate, formatNumber } from '../utils/format'
+import { daysLabel, daysUntil, formatLongDate, formatNumber } from '../utils/format'
+import { DestinationInfoCard } from '../components/journey/DestinationCard'
 
 export function TripDetailPage() {
   const { id } = useParams()
@@ -109,10 +110,11 @@ export function TripDetailPage() {
             <span>{getAirport(trip.origin).city}</span>
             <span>{trip.destination === 'DPS' ? 'Bali' : getAirport(trip.destination).city}</span>
           </div>
-          <div className="mt-4 flex items-center gap-3 text-[13px]">
+          <div className="mt-4 flex items-center gap-3 text-[13px] flex-wrap">
             <span className="rounded-lg bg-white/10 px-2.5 py-1.5 font-semibold tabular-nums">
               {dep} – {arr}
             </span>
+            {!isPast && trip.status !== 'cancelled' && <span className="rounded-lg bg-brand-turquoise/30 text-white px-2.5 py-1.5 font-semibold">{daysLabel(daysUntil(trip.date))}</span>}
             <span className="text-white/75">{trip.terminal}</span>
             <span className="text-white/75">Gate {trip.gate}</span>
             {trip.seat && <span className="text-white/75">Seat {trip.seat}</span>}
@@ -134,9 +136,11 @@ export function TripDetailPage() {
               <AlertTriangle className="h-5 w-5" />
             </span>
             <span className="flex-1 min-w-0">
-              <span className="block text-[13.5px] font-bold text-ink">Delayed {trip.disruption.delayMin} minutes · updated automatically</span>
+              <span className="block text-[13.5px] font-bold text-ink">
+                {trip.disruption.type === 'gate-change' ? `Gate changed to ${trip.disruption.newGate}` : `Delayed ${trip.disruption.delayMin} minutes`} · updated automatically
+              </span>
               <span className="block text-[12px] text-ink-soft">
-                New departure {trip.disruption.newDepartTime} · boarding {trip.disruption.newBoardingTime}
+                {trip.disruption.type === 'gate-change' ? `Previously Gate ${trip.disruption.previousGate} · boarding ${trip.boardingTime} unchanged` : `New departure ${trip.disruption.newDepartTime} · boarding ${trip.disruption.newBoardingTime}`}
               </span>
             </span>
             <ArrowRight className="h-4 w-4 text-ink-muted" />
@@ -212,7 +216,7 @@ export function TripDetailPage() {
               label="Departure"
               value={
                 <>
-                  {trip.disruption && <span className="line-through text-ink-faint font-normal mr-1.5">{trip.departTime}</span>}
+                  {dep !== trip.departTime && <span className="line-through text-ink-faint font-normal mr-1.5">{trip.departTime}</span>}
                   {dep} · {cityOf(trip.origin)} ({trip.origin})
                 </>
               }
@@ -253,6 +257,8 @@ export function TripDetailPage() {
             <p className="text-[11.5px] text-ink-muted">{isPast ? 'Credited' : 'Estimated earning'}</p>
           </section>
         </div>
+
+        {!isPast && <DestinationInfoCard trip={trip} compact />}
 
         {!isPast && (
           <MascotBanner

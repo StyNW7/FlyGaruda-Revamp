@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, FlaskConical, RotateCcw, Undo2, WifiOff, Route, LogIn, Sparkles } from 'lucide-react'
+import { AlertTriangle, DoorOpen, FlaskConical, RotateCcw, Undo2, WifiOff, Route, LogIn, Sparkles } from 'lucide-react'
 import { AppHeader } from '../components/common/AppHeader'
 import { PageContainer } from '../components/common/Layout'
 import { Button } from '../components/common/Button'
@@ -41,6 +41,37 @@ export function PrototypePage() {
         time: 'Just now',
         to: `/flight-update/${trip.id}`,
         iconKey: 'alert',
+      },
+    })
+    navigate(`/flight-update/${trip.id}`)
+  }
+
+  const simulateGate = () => {
+    if (!trip) return
+    dispatch({
+      type: 'APPLY_DISRUPTION',
+      id: trip.id,
+      disruption: {
+        type: 'gate-change',
+        delayMin: 0,
+        newGate: '16',
+        newDepartTime: trip.departTime,
+        newBoardingTime: trip.boardingTime,
+        newArriveTime: trip.arriveTime,
+        reason: 'Operational gate reassignment at Terminal 3',
+        issuedAt: 'Just now',
+      },
+    })
+    dispatch({
+      type: 'ADD_NOTIFICATION',
+      notification: {
+        id: `disruption-${trip.id}`,
+        category: 'travel',
+        title: `Gate changed: ${trip.flightNumber} now boards from Gate 16`,
+        body: `Previously Gate ${trip.gate}. Boarding time ${trip.boardingTime} is unchanged. Your boarding pass has been updated.`,
+        time: 'Just now',
+        to: `/flight-update/${trip.id}`,
+        iconKey: 'gate',
       },
     })
     navigate(`/flight-update/${trip.id}`)
@@ -100,15 +131,20 @@ export function PrototypePage() {
                 <AlertTriangle className="h-4 w-4 text-warning" />
                 <p className="text-[14px] font-bold text-ink">Disruption scenario</p>
               </div>
-              <p className="t-caption mb-3">GA 412 delayed by 35 minutes. Shows automatic trip updates, options and support.</p>
+              <p className="t-caption mb-3">Shows automatic trip updates, options and support for GA 412.</p>
               {trip.disruption ? (
                 <Button variant="secondary" size="sm" leftIcon={<Undo2 className="h-4 w-4" />} onClick={() => { dispatch({ type: 'CLEAR_DISRUPTION', id: trip.id }); toast('Flight back on schedule', 'info') }}>
-                  Clear disruption
+                  Clear {trip.disruption.type === 'gate-change' ? 'gate change' : 'delay'}
                 </Button>
               ) : (
-                <Button size="sm" leftIcon={<AlertTriangle className="h-4 w-4" />} onClick={simulate}>
-                  Simulate flight delay
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" leftIcon={<AlertTriangle className="h-4 w-4" />} onClick={simulate}>
+                    Simulate 35-min delay
+                  </Button>
+                  <Button size="sm" variant="secondary" leftIcon={<DoorOpen className="h-4 w-4" />} onClick={simulateGate}>
+                    Simulate gate change
+                  </Button>
+                </div>
               )}
             </section>
           </>

@@ -80,6 +80,8 @@ export interface SearchParams {
   passengers: Passengers
   cabin: CabinClass
   promoCode?: string
+  /** Outbound flight chosen on a round trip while the return flight is being selected. */
+  outboundFlightId?: string
 }
 
 export interface AddOn {
@@ -89,17 +91,21 @@ export interface AddOn {
   price: number
 }
 
+export interface DraftPassenger {
+  id: string
+  type: 'adult' | 'child' | 'infant'
+  title: string
+  firstName: string
+  lastName: string
+  milesId?: string
+}
+
 export interface BookingDraft {
-  flightId: string
+  /** One id per flight leg (outbound, optionally return). */
+  legIds: string[]
   fareId: FareId
-  passenger: {
-    title: string
-    firstName: string
-    lastName: string
-    email: string
-    phone: string
-    milesId?: string
-  }
+  passengers: DraftPassenger[]
+  contact: { email: string; phone: string }
   seat: string | null
   addOns: string[]
   paymentMethod: string | null
@@ -114,6 +120,8 @@ export type JourneyStage = 'booked' | 'checkin' | 'airport' | 'boarding' | 'infl
 export interface Disruption {
   type: 'delay' | 'gate-change'
   delayMin: number
+  newGate?: string
+  previousGate?: string
   newDepartTime: string
   newBoardingTime: string
   newArriveTime: string
@@ -154,6 +162,9 @@ export interface Trip {
   disruption?: Disruption
   addOns?: string[]
   totalPaid?: number
+  /** Travel checklist items ticked by the traveller (persisted per trip). */
+  checklist?: string[]
+  passengerCount?: number
 }
 
 export interface CompanionEvent {

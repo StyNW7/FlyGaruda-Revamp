@@ -99,6 +99,7 @@ type Action =
   | { type: 'CLEAR_DISRUPTION'; id: string }
   | { type: 'SET_STAGE'; id: string; stage: JourneyStage }
   | { type: 'CANCEL_TRIP'; id: string }
+  | { type: 'TOGGLE_CHECKLIST'; id: string; item: string }
   | { type: 'MARK_READ'; id: string }
   | { type: 'MARK_ALL_READ' }
   | { type: 'DISMISS_ALL' }
@@ -140,14 +141,23 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         trips: state.trips.map((t) =>
-          t.id === action.id ? { ...t, disruption: action.disruption, status: 'delayed' } : t,
+          t.id === action.id
+            ? {
+                ...t,
+                disruption: { ...action.disruption, previousGate: t.disruption?.previousGate ?? t.gate },
+                gate: action.disruption.newGate ?? t.gate,
+                status: action.disruption.delayMin > 0 ? 'delayed' : t.status,
+              }
+            : t,
         ),
       }
     case 'CLEAR_DISRUPTION':
       return {
         ...state,
         trips: state.trips.map((t) =>
-          t.id === action.id ? { ...t, disruption: undefined, status: t.status === 'delayed' ? 'on-time' : t.status } : t,
+          t.id === action.id
+            ? { ...t, disruption: undefined, gate: t.disruption?.previousGate ?? t.gate, status: t.status === 'delayed' ? 'on-time' : t.status }
+            : t,
         ),
       }
     case 'SET_STAGE':
@@ -174,6 +184,15 @@ function reducer(state: AppState, action: Action): AppState {
         trips: state.trips.map((t) =>
           t.id === action.id ? { ...t, status: 'cancelled', category: 'cancelled', checkedIn: false } : t,
         ),
+      }
+    case 'TOGGLE_CHECKLIST':
+      return {
+        ...state,
+        trips: state.trips.map((t) => {
+          if (t.id !== action.id) return t
+          const list = t.checklist ?? []
+          return { ...t, checklist: list.includes(action.item) ? list.filter((i) => i !== action.item) : [...list, action.item] }
+        }),
       }
     case 'MARK_READ':
       return state.readIds.includes(action.id) ? state : { ...state, readIds: [...state.readIds, action.id] }
@@ -219,7 +238,8 @@ function loadState(): AppState {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return initialState
     const parsed = JSON.parse(raw) as Partial<AppState>
-    return { ...initialState, ...parsed, search: { ...DEFAULT_SEARCH, ...(parsed.search ?? {}) } }
+    const draft = parsed.draft && Array.isArray(parsed.draft.passengers) && Array.isArray(parsed.draft.legIds) ? parsed.draft : null
+    return { ...initialState, ...parsed, draft, search: { ...DEFAULT_SEARCH, ...(parsed.search ?? {}) } }
   } catch {
     return initialState
   }

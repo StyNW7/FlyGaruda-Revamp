@@ -38,7 +38,7 @@ import { nextActionFor } from '../data/trips'
 import { cityOf } from '../data/airports'
 import { useApp } from '../store/AppContext'
 import { useOnline } from '../hooks/useOnline'
-import { formatLongDate, formatNumber, greetingForHour } from '../utils/format'
+import { daysLabel, daysUntil, formatLongDate, formatNumber, greetingForHour } from '../utils/format'
 import type { Trip } from '../types'
 import { cn } from '../utils/cn'
 
@@ -91,7 +91,7 @@ function NextTripCard({ trip }: { trip: Trip }) {
     <section className="card overflow-hidden" aria-label="Next trip">
       <div className="p-4 pb-3">
         <div className="flex items-center justify-between mb-3">
-          <span className="t-label text-brand-turquoise">Next trip</span>
+          <span className="t-label text-brand-turquoise">Next trip · <span className="text-ink-muted normal-case tracking-normal font-semibold">{daysLabel(daysUntil(trip.date))}</span></span>
           <StatusBadge status={trip.status} />
         </div>
         <RouteLine origin={trip.origin} destination={trip.destination} size="lg" />
@@ -103,7 +103,7 @@ function NextTripCard({ trip }: { trip: Trip }) {
         <div className="mt-3 grid grid-cols-[1fr_auto] gap-y-1 text-[13px]">
           <span className="text-ink-soft">{formatLongDate(trip.date)}</span>
           <span className="font-semibold text-ink text-right tabular-nums">
-            {trip.disruption && <span className="line-through text-ink-faint font-normal mr-1.5">{trip.departTime}</span>}
+            {trip.disruption && dep !== trip.departTime && <span className="line-through text-ink-faint font-normal mr-1.5">{trip.departTime}</span>}
             {dep} – {arr}
           </span>
           <span className="text-ink-soft">{trip.terminal}</span>
@@ -168,6 +168,9 @@ function MemberHome({ trip }: { trip: Trip }) {
       <div className="card-navy rounded-none rounded-b-[28px] pb-24 safe-top relative overflow-hidden">
         <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/5" aria-hidden />
         <div className="absolute right-10 top-24 h-24 w-24 rounded-full bg-brand-turquoise/25 blur-2xl" aria-hidden />
+        <svg className="absolute inset-x-0 bottom-14 w-full h-16 text-white/20" viewBox="0 0 430 64" fill="none" aria-hidden>
+          <path d="M-10 60 C 120 -10, 310 -10, 440 60" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 6" />
+        </svg>
         <HomeTopBar dark />
         <div className="px-4 -mt-1">
           <p className="text-[13px] text-white/75">Your journey to {trip.destination === 'DPS' ? 'Bali' : cityOf(trip.destination)} is coming up.</p>
@@ -186,8 +189,10 @@ function MemberHome({ trip }: { trip: Trip }) {
               <AlertTriangle className="h-5 w-5" />
             </span>
             <span className="flex-1 min-w-0">
-              <span className="block text-[13.5px] font-bold text-ink">Flight update · {trip.flightNumber} delayed {trip.disruption.delayMin} min</span>
-              <span className="block text-[12px] text-ink-soft">New departure {trip.disruption.newDepartTime}. Your trip has been updated automatically.</span>
+              <span className="block text-[13.5px] font-bold text-ink">
+                Flight update · {trip.disruption.type === 'gate-change' ? `gate changed to ${trip.disruption.newGate}` : `${trip.flightNumber} delayed ${trip.disruption.delayMin} min`}
+              </span>
+              <span className="block text-[12px] text-ink-soft">{trip.disruption.type === 'gate-change' ? `Boarding time unchanged.` : `New departure ${trip.disruption.newDepartTime}.`} Your trip has been updated automatically.</span>
             </span>
             <ChevronRight className="h-4 w-4 text-ink-muted" />
           </button>

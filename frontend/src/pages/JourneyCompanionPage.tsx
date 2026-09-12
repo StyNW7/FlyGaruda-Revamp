@@ -20,6 +20,7 @@ import { Button } from '../components/common/Button'
 import { Mascot } from '../components/common/Mascot'
 import { EmptyState } from '../components/common/States'
 import { WhatsAppPreview } from '../components/journey/WhatsAppPreview'
+import { DestinationInfoCard, TravelChecklist } from '../components/journey/DestinationCard'
 import { useApp } from '../store/AppContext'
 import { stageIndex } from '../data/trips'
 import { cityOf } from '../data/airports'
@@ -118,12 +119,18 @@ function buildEvents(trip: Trip): Event[] {
     events.splice(1, 0, {
       id: 'disruption',
       when: 'Flight update',
-      title: `${trip.flightNumber} is delayed by ${d.delayMin} minutes.`,
+      title: d.type === 'gate-change' ? `Gate changed to ${d.newGate}.` : `${trip.flightNumber} is delayed by ${d.delayMin} minutes.`,
       description: 'Your trip has been updated automatically. No action is needed from you.',
-      details: [
-        { label: 'New departure', value: d.newDepartTime },
-        { label: 'New boarding', value: d.newBoardingTime },
-      ],
+      details:
+        d.type === 'gate-change'
+          ? [
+              { label: 'Previous gate', value: d.previousGate ?? '—' },
+              { label: 'New gate', value: d.newGate ?? trip.gate },
+            ]
+          : [
+              { label: 'New departure', value: d.newDepartTime },
+              { label: 'New boarding', value: d.newBoardingTime },
+            ],
       cta: { label: 'View Update', to: `/flight-update/${trip.id}` },
       state: 'alert',
       icon: AlertTriangle,
@@ -212,6 +219,16 @@ export function JourneyCompanionPage() {
                     </Button>
                   )}
                 </div>
+                {e.id === 'prepare' && trip.category === 'upcoming' && (
+                  <div className="mt-3">
+                    <TravelChecklist trip={trip} />
+                  </div>
+                )}
+                {e.id === 'arrival' && (
+                  <div className="mt-3">
+                    <DestinationInfoCard trip={trip} />
+                  </div>
+                )}
               </li>
             )
           })}
