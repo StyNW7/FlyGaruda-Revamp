@@ -14,6 +14,7 @@ import { TierLadder } from '../components/miles/TierLadder'
 import { RewardSheet } from '../components/miles/RewardSheet'
 import { MilesCalculator } from '../components/miles/MilesCalculator'
 import { ActivityRow } from '../components/miles/ActivityRow'
+import { GoalCard } from '../components/miles/GoalCard'
 import { useApp } from '../store/AppContext'
 import { EARN_PARTNERS, MILES_NEXT, REWARDS, findReward } from '../data/miles'
 import type { Reward } from '../types'
@@ -50,9 +51,9 @@ function MilesLogin() {
         <section>
           <SectionHeader title="Member benefits" subtitle="What Silver, Gold and Platinum unlock" action="Compare tiers" to="/miles/benefits" />
           <div className="card divide-y divide-surface-line overflow-hidden">
-            <ListRow icon={Sparkles} iconTone="gold" title="Priority services" description="Priority check-in, boarding and baggage" chevron={false} />
-            <ListRow icon={Plane} iconTone="gold" title="Award tickets" description="Jakarta → Bali from 7,500 miles" chevron={false} />
-            <ListRow icon={Crown} iconTone="gold" title="Lounge access" description="Garuda Indonesia Lounge on eligible tiers" chevron={false} />
+            <ListRow icon={Sparkles} iconTone="gold" title="Priority services" description="Priority check-in, boarding and baggage" to="/miles/benefits" />
+            <ListRow icon={Plane} iconTone="gold" title="Award tickets" description="Jakarta → Bali from 7,500 miles" to="/miles/benefits?tab=rewards" />
+            <ListRow icon={Crown} iconTone="gold" title="Lounge access" description="Garuda Indonesia Lounge on eligible tiers" to="/miles/benefits" />
           </div>
         </section>
       </PageContainer>
@@ -120,6 +121,8 @@ function Dashboard() {
         )}
 
         <TierLadder />
+
+        <GoalCard />
 
         <div className="grid grid-cols-2 gap-3">
           <StatTile label="Available miles" value={formatNumber(miles.balance)} sub="Ready to redeem" onClick={() => navigate('/miles/benefits?tab=rewards')} />

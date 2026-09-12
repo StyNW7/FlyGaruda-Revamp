@@ -6,6 +6,7 @@ import { Input } from '../components/common/Inputs'
 import { Checkbox } from '../components/common/Inputs'
 import { BottomSheet } from '../components/common/Overlays'
 import { Mascot } from '../components/common/Mascot'
+import { TermsSheet, type TermsKind } from '../components/common/TermsSheet'
 import { useToast } from '../components/common/Toast'
 import { DEMO_CREDENTIALS, USER } from '../data/user'
 import { useApp } from '../store/AppContext'
@@ -57,6 +58,7 @@ function JoinSheet({ open, onClose, onJoined }: { open: boolean; onClose: () => 
   const [password, setPassword] = useState('')
   const [agree, setAgree] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [terms, setTerms] = useState<TermsKind | null>(null)
   const valid = name.trim().length >= 3 && /\S+@\S+\.\S+/.test(email) && phone.trim().length >= 8 && password.length >= 8 && agree
   return (
     <BottomSheet
@@ -88,7 +90,8 @@ function JoinSheet({ open, onClose, onJoined }: { open: boolean; onClose: () => 
         <Input label="Email" type="email" leftIcon={Mail} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" autoComplete="email" />
         <Input label="Mobile number" type="tel" leftIcon={Phone} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+62" autoComplete="tel" />
         <Input label="Password" type="password" leftIcon={Lock} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" hint={password && password.length < 8 ? `${8 - password.length} more characters` : undefined} autoComplete="new-password" />
-        <Checkbox checked={agree} onChange={setAgree} label={<>I agree to the GarudaMiles <span className="font-semibold text-brand-blue">programme terms</span> and <span className="font-semibold text-brand-blue">privacy policy</span>.</>} />
+        <Checkbox checked={agree} onChange={setAgree} label={<>I agree to the GarudaMiles <button type="button" onClick={(e) => { e.preventDefault(); setTerms('programme') }} className="font-semibold text-brand-blue hover:underline">programme terms</button> and <button type="button" onClick={(e) => { e.preventDefault(); setTerms('privacy-policy') }} className="font-semibold text-brand-blue hover:underline">privacy policy</button>.</>} />
+        <TermsSheet open={terms !== null} onClose={() => setTerms(null)} kind={terms ?? 'programme'} />
         <div className="rounded-xl bg-brand-gold-soft border border-brand-gold/30 p-3 text-[12.5px] text-ink flex items-start gap-2">
           <Sparkles className="h-4 w-4 text-[#8A6A1F] shrink-0 mt-0.5" />
           <span>Welcome bonus: 500 miles credited after your first Garuda flight. In this prototype your new account uses the demo member data.</span>

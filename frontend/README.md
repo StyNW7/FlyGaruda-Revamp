@@ -32,10 +32,11 @@ button does something real inside the prototype (state changes, generated files,
 
 | Feature | What really happens |
 | --- | --- |
-| **Share Garuda Passport** | Renders a real 1080 × 1920 PNG (Instagram-story size) on a canvas — choose a theme, preview it, **Save image** downloads it, **Share** opens the native share sheet. |
+| **Share Garuda Passport (Story Studio)** | Renders a real PNG on a canvas — Story (1080 × 1920) or Feed post (1080 × 1080). Pick a preset theme or your **own colours** (primary / secondary / accent), mascot, headline & caption, and toggle map / stamps / badges / stats / member ID. Live preview; **Save image** downloads it, **Share** opens the native share sheet. Choices are remembered. |
 | **Boarding pass → Share / Wallet** | Same: a real PNG of the pass is generated and saved. |
 | **Add to Calendar** | Downloads a standards-compliant `.ics` event (works with Google / Apple / Outlook). |
 | **Share itinerary** | Native share sheet, or copies the itinerary to the clipboard. |
+| **Miles goal** | Set any reward as your goal; Home and GarudaMiles track miles-to-go and flights-to-go. |
 | **GarudaMiles** | Redeeming deducts miles, issues a voucher (My Rewards) with a code + QR; vouchers can be applied to a trip. Completing a journey credits miles + tier bonus. Claim missing miles, export a CSV statement, miles calculator. |
 | **Checkout** | Promo codes `GARUDA10`, `BALI15`, `MILES2026` apply a real discount; **Cash + Miles** lets you pay part of the fare with miles (slider). |
 | **Trips → Add trip** | Retrieve demo bookings `KD7P2Q` (Wijaya) and `BX3W8N` (Anggraini). |

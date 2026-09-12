@@ -7,6 +7,7 @@ import { Button } from '../components/common/Button'
 import { Checkbox, Input, RadioRow, Toggle } from '../components/common/Inputs'
 import { BottomSheet, Modal } from '../components/common/Overlays'
 import { SeatLegend, SeatMap } from '../components/booking/SeatMap'
+import { TermsSheet, type TermsKind } from '../components/common/TermsSheet'
 import { seatType } from '../utils/seats'
 import { ADD_ONS, FARE_FAMILIES, findFlight } from '../data/flights'
 import { MILES_TO_IDR, PROMO_CODES } from '../data/miles'
@@ -56,6 +57,7 @@ export function CheckoutPage() {
   const [agree, setAgree] = useState(false)
   const [contactOpen, setContactOpen] = useState(!isMember)
   const [milesToUse, setMilesToUse] = useState(2000)
+  const [terms, setTerms] = useState<TermsKind | null>(null)
   const completedRef = useRef(false)
 
   useEffect(() => {
@@ -383,7 +385,9 @@ export function CheckoutPage() {
               onChange={setAgree}
               label={
                 <>
-                  I agree to Garuda Indonesia’s <span className="font-semibold text-brand-blue">conditions of carriage</span> and <span className="font-semibold text-brand-blue">fare rules</span>.
+                  I agree to Garuda Indonesia’s{' '}
+                  <button type="button" onClick={(e) => { e.preventDefault(); setTerms('terms') }} className="font-semibold text-brand-blue underline-offset-2 hover:underline">conditions of carriage</button> and{' '}
+                  <button type="button" onClick={(e) => { e.preventDefault(); setTerms('fare-rules') }} className="font-semibold text-brand-blue underline-offset-2 hover:underline">fare rules</button>.
                 </>
               }
             />
@@ -434,6 +438,8 @@ export function CheckoutPage() {
         <SeatLegend />
         <SeatMap selected={draft.seat} onSelect={(seat) => update({ seat })} seed={legs[0].number} className="mt-4" />
       </BottomSheet>
+
+      <TermsSheet open={terms !== null} onClose={() => setTerms(null)} kind={terms ?? 'terms'} fareId={draft.fareId} />
 
       <Modal open={processing} onClose={() => undefined} dismissible={false}>
         <div className="flex flex-col items-center text-center py-4">

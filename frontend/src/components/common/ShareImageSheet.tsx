@@ -23,6 +23,8 @@ export function ShareImageSheet({
   deps = [],
   controls,
   onSaved,
+  aspect = 'story',
+  debounceMs = 0,
 }: {
   open: boolean
   onClose: () => void
@@ -33,12 +35,16 @@ export function ShareImageSheet({
   shareText?: string
   render: () => Promise<Blob>
   deps?: unknown[]
-  /** Optional controls rendered above the preview (theme picker, etc.). */
+  /** Optional controls rendered below the preview (customiser, etc.). */
   controls?: ReactNode
   onSaved?: () => void
+  aspect?: 'story' | 'square'
+  /** Delay before re-rendering after an option changes (keeps typing smooth). */
+  debounceMs?: number
 }) {
   const toast = useToast()
-  const { blob, url, loading, error } = useRenderedImage(render, open, deps)
+  const { blob, url, loading, error } = useRenderedImage(render, open, deps, debounceMs)
+  const dims = aspect === 'square' ? '1080 × 1080' : '1080 × 1920'
   const [saved, setSaved] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -47,7 +53,7 @@ export function ShareImageSheet({
     downloadBlob(blob, filename)
     setSaved(true)
     onSaved?.()
-    toast('Image saved · 1080 × 1920 PNG')
+    toast(`Image saved · ${dims} PNG`)
     window.setTimeout(() => setSaved(false), 2500)
   }
 
@@ -82,10 +88,9 @@ export function ShareImageSheet({
         </div>
       }
     >
-      {controls && <div className="mb-3">{controls}</div>}
-      <div className="mx-auto w-[236px] aspect-[9/16] rounded-[22px] overflow-hidden bg-brand-navy shadow-float relative">
-        {url && !loading ? (
-          <img src={url} alt={`${title} preview`} className="h-full w-full object-cover animate-fade-in" />
+      <div className={cn('mx-auto rounded-[22px] overflow-hidden bg-brand-navy shadow-float relative transition-all', aspect === 'square' ? 'w-[260px] aspect-square' : 'w-[236px] aspect-[9/16]')}>
+        {url ? (
+          <img src={url} alt={`${title} preview`} className={cn('h-full w-full object-cover animate-fade-in transition-opacity', loading && 'opacity-60')} />
         ) : (
           <div className={cn('absolute inset-0 flex flex-col items-center justify-center text-white/80 text-[12px] gap-3', error && 'text-error')}>
             {error ? (
@@ -99,7 +104,8 @@ export function ShareImageSheet({
           </div>
         )}
       </div>
-      <p className="text-[11px] text-ink-faint text-center mt-3">Instagram story size · 1080 × 1920 px · the preview is the exact image you save.</p>
+      <p className="text-[11px] text-ink-faint text-center mt-3">{aspect === 'square' ? 'Instagram post size' : 'Instagram story size'} · {dims} px · the preview is the exact image you save.</p>
+      {controls && <div className="mt-4 pt-4 border-t border-surface-line">{controls}</div>}
     </BottomSheet>
   )
 }

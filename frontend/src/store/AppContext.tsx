@@ -31,7 +31,38 @@ import { MILES_ACTIVITY, MILES_SEED, TIERS, nextTierFor, tierForMiles } from '..
 const STORAGE_KEY = 'flygaruda.state.v2'
 
 export type AuthState = 'unknown' | 'guest' | 'member'
-export type ShareTheme = 'navy' | 'turquoise' | 'gold'
+export type ShareTheme = 'navy' | 'turquoise' | 'gold' | 'sunset' | 'custom'
+export type ShareFormat = 'story' | 'square'
+export type ShareMascot = 'wave' | 'hi' | 'love' | 'respect' | 'chill' | 'baggage' | 'none'
+
+/** Everything the traveller can customise on the shareable passport card. */
+export interface ShareOptions {
+  theme: ShareTheme
+  custom: { primary: string; secondary: string; accent: string }
+  format: ShareFormat
+  mascot: ShareMascot
+  showMap: boolean
+  showStamps: boolean
+  showBadges: boolean
+  showStats: boolean
+  showMemberId: boolean
+  headline: string
+  caption: string
+}
+
+export const DEFAULT_SHARE: ShareOptions = {
+  theme: 'navy',
+  custom: { primary: '#10306F', secondary: '#0A1F4D', accent: '#3FC5CF' },
+  format: 'story',
+  mascot: 'wave',
+  showMap: true,
+  showStamps: true,
+  showBadges: true,
+  showStats: true,
+  showMemberId: true,
+  headline: '',
+  caption: '',
+}
 
 /** Serializable notification created at runtime (icons are resolved by key). */
 export interface RuntimeNotification {
@@ -97,7 +128,9 @@ export interface AppState {
   savedReads: string[]
   devices: Device[]
   prefs: Prefs
-  shareTheme: ShareTheme
+  share: ShareOptions
+  /** Reward the member is saving miles for (reward id). */
+  milesGoal: string | null
 }
 
 export const DEFAULT_SEARCH: SearchParams = {
@@ -141,7 +174,8 @@ const initialState: AppState = {
   savedReads: [],
   devices: DEVICES,
   prefs: { haptics: true, biometrics: true, location: true, analytics: false, offlinePass: true },
-  shareTheme: 'navy',
+  share: DEFAULT_SHARE,
+  milesGoal: null,
 }
 
 type Action =
@@ -186,7 +220,8 @@ type Action =
   | { type: 'TOGGLE_SAVED_READ'; id: string }
   | { type: 'SIGN_OUT_DEVICE'; id: string }
   | { type: 'SET_PREF'; key: keyof Prefs; value: boolean }
-  | { type: 'SET_SHARE_THEME'; value: ShareTheme }
+  | { type: 'SET_SHARE'; patch: Partial<ShareOptions> }
+  | { type: 'SET_MILES_GOAL'; rewardId: string | null }
   | { type: 'RESET_TRIPS' }
   | { type: 'RESET_ALL' }
 
@@ -398,8 +433,10 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, devices: state.devices.filter((d) => d.id !== action.id || d.current) }
     case 'SET_PREF':
       return { ...state, prefs: { ...state.prefs, [action.key]: action.value } }
-    case 'SET_SHARE_THEME':
-      return { ...state, shareTheme: action.value }
+    case 'SET_SHARE':
+      return { ...state, share: { ...state.share, ...action.patch } }
+    case 'SET_MILES_GOAL':
+      return { ...state, milesGoal: action.rewardId }
     case 'RESET_TRIPS':
       return {
         ...state,
@@ -432,6 +469,7 @@ function loadState(): AppState {
       search: { ...DEFAULT_SEARCH, ...(parsed.search ?? {}) },
       miles: { ...initialState.miles, ...(parsed.miles ?? {}) },
       prefs: { ...initialState.prefs, ...(parsed.prefs ?? {}) },
+      share: { ...DEFAULT_SHARE, ...(parsed.share ?? {}), custom: { ...DEFAULT_SHARE.custom, ...(parsed.share?.custom ?? {}) } },
     }
   } catch {
     return initialState

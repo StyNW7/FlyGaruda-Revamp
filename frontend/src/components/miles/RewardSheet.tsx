@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, Check, Copy, Gift, Info } from 'lucide-react'
+import { ArrowRight, Check, Copy, Gift, Info, Target } from 'lucide-react'
 import type { Reward, Voucher } from '../../types'
 import { BottomSheet } from '../common/Overlays'
 import { Button } from '../common/Button'
@@ -20,7 +20,7 @@ function expiryFor(reward: Reward): string {
 
 /** Full redemption flow: review → confirm → voucher issued. Miles are really deducted from the balance. */
 export function RewardSheet({ reward, onClose }: { reward: Reward | null; onClose: () => void }) {
-  const { miles, dispatch } = useApp()
+  const { miles, dispatch, state } = useApp()
   const navigate = useNavigate()
   const toast = useToast()
   const [step, setStep] = useState<'review' | 'done'>('review')
@@ -35,6 +35,7 @@ export function RewardSheet({ reward, onClose }: { reward: Reward | null; onClos
   }, [reward])
 
   if (!reward) return null
+  const isGoal = state.milesGoal === reward.id
   const enough = miles.balance >= reward.miles
   const after = miles.balance - reward.miles
   const Icon = reward.icon
@@ -138,6 +139,23 @@ export function RewardSheet({ reward, onClose }: { reward: Reward | null; onClos
               <span>You need {formatNumber(Math.abs(after))} more miles. A Jakarta → Bali flight earns about 1,062 miles at your tier.</span>
             </div>
           )}
+
+          <button
+            type="button"
+            onClick={() => {
+              dispatch({ type: 'SET_MILES_GOAL', rewardId: isGoal ? null : reward.id })
+              toast(isGoal ? 'Goal removed' : `Saving for ${reward.title.split(' · ')[0]}`, 'info')
+            }}
+            className={cn('w-full flex items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition-colors', isGoal ? 'border-success/40 bg-success-soft' : 'border-surface-line bg-white')}
+          >
+            <span className={cn('h-9 w-9 rounded-full flex items-center justify-center shrink-0', isGoal ? 'bg-success text-white' : 'bg-brand-gold-soft text-[#8A6A1F]')}>
+              {isGoal ? <Check className="h-4 w-4" strokeWidth={3} /> : <Target className="h-4 w-4" />}
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-[13.5px] font-semibold text-ink">{isGoal ? 'This is your miles goal' : 'Make this my miles goal'}</span>
+              <span className="block text-[11.5px] text-ink-muted">{isGoal ? 'Tracked on Home and GarudaMiles · tap to remove' : 'Track your progress on Home and GarudaMiles'}</span>
+            </span>
+          </button>
 
           <div>
             <p className="t-label mb-2">Conditions</p>

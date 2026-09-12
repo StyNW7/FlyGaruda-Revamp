@@ -31,6 +31,7 @@ import { CompanionCard } from '../components/journey/CompanionCard'
 import { WhatsAppPreview } from '../components/journey/WhatsAppPreview'
 import { RouteLine, TripMiniCard } from '../components/trips/TripCard'
 import { SearchForm } from '../components/booking/SearchForm'
+import { GoalCard } from '../components/miles/GoalCard'
 import { VALUE_ITEMS } from '../data/flights'
 import { DESTINATIONS, OFFERS } from '../data/offers'
 import { nextActionFor } from '../data/trips'
@@ -144,7 +145,7 @@ function NextTripCard({ trip }: { trip: Trip }) {
 
 function MemberHome({ trip }: { trip: Trip }) {
   const navigate = useNavigate()
-  const { upcomingTrips } = useApp()
+  const { upcomingTrips, miles } = useApp()
   const online = useOnline()
   const [wa, setWa] = useState(false)
   const others = upcomingTrips.filter((t) => t.id !== trip.id)
@@ -219,6 +220,25 @@ function MemberHome({ trip }: { trip: Trip }) {
             <CompanionCard icon={MapPin} title={`Recommended airport arrival: ${trip.disruption ? '06:50' : '06:15'}`} description={`${trip.terminal} · Boarding ${trip.disruption ? trip.disruption.newBoardingTime : trip.boardingTime} at Gate ${trip.gate}`} to={`/trips/${trip.id}/companion`} />
             <CompanionCard icon={Car} title="Traffic to Terminal 3 is currently moderate" description="Estimated 52 minutes from your home. Leave by 05:20 to arrive comfortably." meta="Based on your saved home address" />
           </div>
+        </section>
+
+        <section>
+          <SectionHeader title="GarudaMiles" subtitle={`${miles.tier.name} member`} action="Open" to="/miles" />
+          <button type="button" onClick={() => navigate('/miles')} className="w-full card-navy p-4 text-left press relative overflow-hidden">
+            <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/5" aria-hidden />
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.12em] text-white/60">Miles balance</p>
+                <p className="text-[28px] font-bold leading-none mt-1">{formatNumber(miles.balance)}</p>
+              </div>
+              <div className="text-right text-[11.5px] text-white/70">
+                <p>+{formatNumber(trip.milesEstimate)} miles on {trip.flightNumber}</p>
+                <p className="mt-0.5">{miles.nextTier ? `${formatNumber(miles.milesToNextTier)} to ${miles.nextTier.name}` : 'Top tier'}</p>
+              </div>
+            </div>
+            <ProgressBar value={miles.progressPct} max={100} tone="inverse" className="mt-3" label="Tier progress" />
+          </button>
+          <GoalCard compact className="mt-2.5" />
         </section>
 
         <MascotBanner

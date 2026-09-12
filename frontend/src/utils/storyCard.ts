@@ -104,33 +104,80 @@ function pill(ctx: Ctx, x: number, y: number, text: string, opts: { fill: string
   return w
 }
 
-const THEMES: Record<ShareTheme, { stops: [string, string, string]; accent: string; accentSoft: string; glowA: string; glowB: string; label: string }> = {
+interface Palette {
+  stops: [string, string, string]
+  accent: string
+  accentSoft: string
+  glowA: string
+  glowB: string
+  label: string
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace('#', '')
+  const v = h.length === 3 ? h.split('').map((c) => c + c).join('') : h
+  const n = parseInt(v, 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+
+function rgba(hex: string, alpha: number) {
+  const [r, g, b] = hexToRgb(hex)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
+function mix(a: string, b: string, t: number) {
+  const [r1, g1, b1] = hexToRgb(a)
+  const [r2, g2, b2] = hexToRgb(b)
+  const c = (x: number, y: number) => Math.round(x + (y - x) * t)
+  return `rgb(${c(r1, r2)},${c(g1, g2)},${c(b1, b2)})`
+}
+
+const PRESETS: Record<Exclude<ShareTheme, 'custom'>, Palette> = {
   navy: { stops: ['#123579', '#0C265D', '#081C48'], accent: '#3FC5CF', accentSoft: 'rgba(63,197,207,0.18)', glowA: 'rgba(0,130,149,0.45)', glowB: 'rgba(201,162,75,0.25)', label: 'Midnight Navy' },
   turquoise: { stops: ['#0A8C9E', '#046E80', '#0C3D5E'], accent: '#FFFFFF', accentSoft: 'rgba(255,255,255,0.18)', glowA: 'rgba(255,255,255,0.28)', glowB: 'rgba(12,38,93,0.55)', label: 'Ocean Turquoise' },
   gold: { stops: ['#8A6A1F', '#5C4413', '#2A2110'], accent: '#F1D98A', accentSoft: 'rgba(241,217,138,0.2)', glowA: 'rgba(201,162,75,0.5)', glowB: 'rgba(255,255,255,0.12)', label: 'Heritage Gold' },
+  sunset: { stops: ['#B8442F', '#7A1F3D', '#2B1240'], accent: '#FFC978', accentSoft: 'rgba(255,201,120,0.2)', glowA: 'rgba(255,140,80,0.45)', glowB: 'rgba(120,60,200,0.35)', label: 'Bali Sunset' },
 }
 
-export const SHARE_THEMES = (Object.keys(THEMES) as ShareTheme[]).map((id) => ({ id, label: THEMES[id].label, stops: THEMES[id].stops }))
+export const SHARE_THEMES = (Object.keys(PRESETS) as Exclude<ShareTheme, 'custom'>[]).map((id) => ({ id, label: PRESETS[id].label, stops: PRESETS[id].stops }))
 
-function background(ctx: Ctx, theme: ShareTheme) {
-  const t = THEMES[theme]
-  const g = ctx.createLinearGradient(0, 0, STORY_W, STORY_H)
+export interface CustomColours {
+  primary: string
+  secondary: string
+  accent: string
+}
+
+/** Resolves a preset or the traveller's own colours into a full palette. */
+export function paletteFor(theme: ShareTheme, custom: CustomColours): Palette {
+  if (theme !== 'custom') return PRESETS[theme]
+  return {
+    stops: [custom.primary, mix(custom.primary, custom.secondary, 0.55), custom.secondary],
+    accent: custom.accent,
+    accentSoft: rgba(custom.accent, 0.2),
+    glowA: rgba(custom.accent, 0.4),
+    glowB: 'rgba(255,255,255,0.14)',
+    label: 'Custom',
+  }
+}
+
+function background(ctx: Ctx, t: Palette, w = STORY_W, h = STORY_H) {
+  const g = ctx.createLinearGradient(0, 0, w, h)
   g.addColorStop(0, t.stops[0])
   g.addColorStop(0.55, t.stops[1])
   g.addColorStop(1, t.stops[2])
   ctx.fillStyle = g
-  ctx.fillRect(0, 0, STORY_W, STORY_H)
+  ctx.fillRect(0, 0, w, h)
 
   // Soft ambient light
-  glow(ctx, 960, 380, 520, t.glowA)
-  glow(ctx, 120, 1640, 560, t.glowB)
+  glow(ctx, w - 120, h * 0.2, 520, t.glowA)
+  glow(ctx, 120, h - 280, 560, t.glowB)
 
   // Large translucent rings
   ctx.strokeStyle = 'rgba(255,255,255,0.06)'
   ctx.lineWidth = 2
   for (const r of [420, 560, 700]) {
     ctx.beginPath()
-    ctx.arc(1010, 160, r, 0, Math.PI * 2)
+    ctx.arc(w - 70, 160, r, 0, Math.PI * 2)
     ctx.stroke()
   }
 
@@ -140,15 +187,15 @@ function background(ctx: Ctx, theme: ShareTheme) {
   ctx.strokeStyle = 'rgba(255,255,255,0.22)'
   ctx.lineWidth = 3
   ctx.beginPath()
-  ctx.moveTo(-40, 1180)
-  ctx.bezierCurveTo(260, 900, 720, 900, 1120, 620)
+  ctx.moveTo(-40, h * 0.62)
+  ctx.bezierCurveTo(w * 0.24, h * 0.47, w * 0.67, h * 0.47, w + 40, h * 0.32)
   ctx.stroke()
   ctx.restore()
 
   // Subtle dot grid
   ctx.fillStyle = 'rgba(255,255,255,0.05)'
-  for (let y = 120; y < STORY_H; y += 56) {
-    for (let x = 60; x < STORY_W; x += 56) {
+  for (let y = 120; y < h; y += 56) {
+    for (let x = 60; x < w; x += 56) {
       ctx.beginPath()
       ctx.arc(x, y, 1.6, 0, Math.PI * 2)
       ctx.fill()
@@ -156,7 +203,7 @@ function background(ctx: Ctx, theme: ShareTheme) {
   }
 }
 
-async function header(ctx: Ctx, rightLabel: string, theme: ShareTheme) {
+async function header(ctx: Ctx, rightLabel: string, t: Palette, w = STORY_W) {
   const logo = await loadImage('/brand/wordmark-white.png')
   if (logo) {
     const h = 54
@@ -169,18 +216,18 @@ async function header(ctx: Ctx, rightLabel: string, theme: ShareTheme) {
     ctx.fillText('Garuda Indonesia', 80, 135)
   }
   font(ctx, 20, 700, 3)
-  const w = ctx.measureText(rightLabel.toUpperCase()).width + 48
-  pill(ctx, STORY_W - 80 - w, 92, rightLabel.toUpperCase(), { fill: 'rgba(255,255,255,0.08)', stroke: 'rgba(255,255,255,0.22)', color: THEMES[theme].accent, size: 20, padX: 24, height: 54, spacing: 3 })
+  const pw = ctx.measureText(rightLabel.toUpperCase()).width + 48
+  pill(ctx, w - 80 - pw, 92, rightLabel.toUpperCase(), { fill: 'rgba(255,255,255,0.08)', stroke: 'rgba(255,255,255,0.22)', color: t.accent, size: 20, padX: 24, height: 54, spacing: 3 })
 }
 
-function footer(ctx: Ctx, left: string, right: string) {
+function footer(ctx: Ctx, left: string, right: string, w = STORY_W, h = STORY_H) {
   ctx.textBaseline = 'middle'
   font(ctx, 24, 600, 1)
   ctx.fillStyle = 'rgba(255,255,255,0.62)'
   ctx.textAlign = 'left'
-  ctx.fillText(left, 80, STORY_H - 84)
+  ctx.fillText(left, 80, h - 84)
   ctx.textAlign = 'right'
-  ctx.fillText(right, STORY_W - 80, STORY_H - 84)
+  ctx.fillText(right, w - 80, h - 84)
   ctx.textAlign = 'left'
 }
 
@@ -188,10 +235,10 @@ function toBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not render image'))), 'image/png'))
 }
 
-function makeCanvas(): { canvas: HTMLCanvasElement; ctx: Ctx } {
+function makeCanvas(w = STORY_W, h = STORY_H): { canvas: HTMLCanvasElement; ctx: Ctx } {
   const canvas = document.createElement('canvas')
-  canvas.width = STORY_W
-  canvas.height = STORY_H
+  canvas.width = w
+  canvas.height = h
   const ctx = canvas.getContext('2d') as Ctx
   return { canvas, ctx }
 }
@@ -210,12 +257,33 @@ export interface PassportCardData {
   routes: { from: AirportCode; to: AirportCode }[]
   visited: AirportCode[]
   badges: string[]
-  theme: ShareTheme
-  headline?: string
+  /** Optional narrative facts (longest flight, favourite city…) used when the map is hidden. */
+  highlights?: { label: string; value: string; sub: string }[]
 }
 
-function drawRouteMap(ctx: Ctx, x: number, y: number, w: number, h: number, data: PassportCardData) {
-  const t = THEMES[data.theme]
+export type StoryMascot = 'wave' | 'hi' | 'love' | 'respect' | 'chill' | 'baggage' | 'none'
+
+export interface PassportRenderOptions {
+  theme: ShareTheme
+  custom: CustomColours
+  format: 'story' | 'square'
+  mascot: StoryMascot
+  showMap: boolean
+  showStamps: boolean
+  showBadges: boolean
+  showStats: boolean
+  showMemberId: boolean
+  headline?: string
+  caption?: string
+}
+
+export const SQUARE_W = 1080
+export const SQUARE_H = 1080
+
+const STAMP_ROTATIONS = [-0.12, 0.08, -0.05, 0.1, -0.08, 0.06]
+const BADGE_GOLD = '#F1D98A'
+
+function drawRouteMap(ctx: Ctx, x: number, y: number, w: number, h: number, data: PassportCardData, t: Palette) {
   fillRR(ctx, x, y, w, h, 36, 'rgba(255,255,255,0.07)', 'rgba(255,255,255,0.14)')
   ctx.save()
   rr(ctx, x, y, w, h, 36)
@@ -324,38 +392,14 @@ function drawStamp(ctx: Ctx, cx: number, cy: number, d: number, stamp: { code: s
   ctx.textAlign = 'left'
 }
 
-export async function renderPassportStory(data: PassportCardData): Promise<Blob> {
-  await ensureFonts()
-  const { canvas, ctx } = makeCanvas()
-  const t = THEMES[data.theme]
-  background(ctx, data.theme)
-  await header(ctx, 'Garuda Flight Passport', data.theme)
-
-  // Eyebrow + headline
+function sectionLabel(ctx: Ctx, text: string, x: number, y: number) {
+  font(ctx, 20, 700, 3)
+  ctx.fillStyle = 'rgba(255,255,255,0.6)'
   ctx.textBaseline = 'alphabetic'
-  font(ctx, 26, 700, 5)
-  ctx.fillStyle = t.accent
-  ctx.fillText(`MY GARUDA PASSPORT · ${new Date().getFullYear()}`, 80, 292)
+  ctx.fillText(text, x, y)
+}
 
-  font(ctx, 92, 800, -2)
-  ctx.fillStyle = '#fff'
-  const headline = data.headline ?? `${data.stats.destinations} destinations, ${formatNumber(data.stats.distanceKm)} km flown.`
-  const lines = wrap(ctx, headline, 920).slice(0, 3)
-  lines.forEach((l, i) => ctx.fillText(l, 80, 400 + i * 104))
-  let y = 400 + lines.length * 104 - 40
-
-  // Member line
-  font(ctx, 40, 800)
-  ctx.fillStyle = '#fff'
-  ctx.fillText(data.name, 80, y + 36)
-  const nameW = ctx.measureText(data.name).width
-  pill(ctx, 80 + nameW + 22, y - 2, `GarudaMiles ${data.tier}`, { fill: 'rgba(255,255,255,0.1)', stroke: 'rgba(255,255,255,0.22)', color: '#fff', size: 22, padX: 22, height: 50 })
-  font(ctx, 24, 600, 1)
-  ctx.fillStyle = 'rgba(255,255,255,0.65)'
-  ctx.fillText(`${data.milesId} · Member since ${data.memberSince}`, 80, y + 82)
-  y += 130
-
-  // Stats tiles
+function drawStatTiles(ctx: Ctx, y: number, data: PassportCardData, w: number, height = 150) {
   const tiles = [
     { label: 'Flights', value: String(data.stats.flights) },
     { label: 'Destinations', value: String(data.stats.destinations) },
@@ -363,59 +407,182 @@ export async function renderPassportStory(data: PassportCardData): Promise<Blob>
     { label: 'Miles earned', value: formatNumber(data.stats.miles) },
   ]
   const gap = 18
-  const tw = (STORY_W - 160 - gap * 3) / 4
+  const tw = (w - 160 - gap * 3) / 4
   tiles.forEach((tile, i) => {
     const tx = 80 + i * (tw + gap)
-    fillRR(ctx, tx, y, tw, 150, 28, 'rgba(255,255,255,0.09)', 'rgba(255,255,255,0.16)')
+    fillRR(ctx, tx, y, tw, height, 28, 'rgba(255,255,255,0.09)', 'rgba(255,255,255,0.16)')
     font(ctx, 19, 700, 2)
     ctx.fillStyle = 'rgba(255,255,255,0.6)'
+    ctx.textBaseline = 'alphabetic'
     ctx.fillText(tile.label.toUpperCase(), tx + 24, y + 48)
     font(ctx, tile.value.length > 8 ? 34 : 42, 800, -1)
     ctx.fillStyle = '#fff'
-    ctx.fillText(tile.value, tx + 24, y + 108)
+    ctx.fillText(tile.value, tx + 24, y + height - 42)
   })
-  y += 190
+}
 
-  // Route map
-  drawRouteMap(ctx, 80, y, STORY_W - 160, 500, data)
-  y += 540
+function drawStampsRow(ctx: Ctx, y: number, data: PassportCardData, o: PassportRenderOptions, t: Palette, d: number) {
+  const stamps = data.stamps.slice(0, o.mascot === 'none' ? 6 : 4)
+  sectionLabel(ctx, 'DESTINATION STAMPS', 80, y + 20)
+  stamps.forEach((st, i) => drawStamp(ctx, 80 + d / 2 + i * (d + 14), y + 60 + d / 2, d, st, STAMP_ROTATIONS[i % 6], t.accent))
+  return y + 60 + d + 44
+}
 
-  // Stamps (left) + mascot (right)
-  const stamps = data.stamps.slice(0, 4)
-  font(ctx, 20, 700, 3)
-  ctx.fillStyle = 'rgba(255,255,255,0.6)'
-  ctx.fillText('DESTINATION STAMPS', 80, y + 20)
-  const d = 138
-  stamps.forEach((s, i) => {
-    const rot = [-0.12, 0.08, -0.05, 0.1][i % 4]
-    drawStamp(ctx, 80 + d / 2 + i * (d + 14), y + 60 + d / 2, d, s, rot, t.accent)
+function drawHighlights(ctx: Ctx, y: number, items: { label: string; value: string; sub: string }[], w: number, t: Palette) {
+  sectionLabel(ctx, 'JOURNEY HIGHLIGHTS', 80, y)
+  const gap = 18
+  const tw = (w - 160 - gap) / 2
+  items.slice(0, 4).forEach((it, i) => {
+    const tx = 80 + (i % 2) * (tw + gap)
+    const ty = y + 22 + Math.floor(i / 2) * (128 + gap)
+    fillRR(ctx, tx, ty, tw, 128, 26, 'rgba(255,255,255,0.08)', 'rgba(255,255,255,0.15)')
+    font(ctx, 18, 700, 2)
+    ctx.fillStyle = t.accent
+    ctx.textBaseline = 'alphabetic'
+    ctx.fillText(it.label.toUpperCase(), tx + 24, ty + 42)
+    font(ctx, 32, 800, -0.5)
+    ctx.fillStyle = '#fff'
+    ctx.fillText(it.value, tx + 24, ty + 82)
+    font(ctx, 20, 600, 0)
+    ctx.fillStyle = 'rgba(255,255,255,0.65)'
+    ctx.fillText(it.sub, tx + 24, ty + 110)
   })
-  const mascot = await loadImage('/mascot/wave.png')
-  if (mascot) {
-    const size = 360
-    ctx.save()
-    ctx.shadowColor = 'rgba(0,0,0,0.35)'
-    ctx.shadowBlur = 40
-    ctx.shadowOffsetY = 18
-    ctx.drawImage(mascot, STORY_W - 80 - size + 30, y - 20, size, size)
-    ctx.restore()
-  }
-  y += 60 + d + 44
+  return y + 22 + Math.ceil(Math.min(items.length, 4) / 2) * (128 + gap) + 30
+}
 
-  // Badges
-  font(ctx, 20, 700, 3)
-  ctx.fillStyle = 'rgba(255,255,255,0.6)'
-  ctx.fillText('BADGES EARNED', 80, y)
-  let bx = 80
-  const by = y + 22
-  for (const b of data.badges.slice(0, 4)) {
-    const w = pill(ctx, bx, by, b, { fill: 'rgba(201,162,75,0.16)', stroke: 'rgba(241,217,138,0.5)', color: '#F1D98A', size: 22, padX: 22, height: 52 })
+async function drawMascot(ctx: Ctx, mascot: StoryMascot, x: number, y: number, size: number) {
+  if (mascot === 'none') return
+  const img = await loadImage(`/mascot/${mascot}.png`)
+  if (!img) return
+  ctx.save()
+  ctx.shadowColor = 'rgba(0,0,0,0.35)'
+  ctx.shadowBlur = 40
+  ctx.shadowOffsetY = 18
+  ctx.drawImage(img, x, y, size, size)
+  ctx.restore()
+}
+
+function drawBadgePills(ctx: Ctx, x: number, y: number, badges: string[], maxX: number) {
+  let bx = x
+  for (const b of badges) {
+    font(ctx, 22, 700, 0)
+    const w = ctx.measureText(b).width + 44
+    if (bx + w > maxX) break
+    pill(ctx, bx, y, b, { fill: rgba(BADGE_GOLD, 0.14), stroke: rgba(BADGE_GOLD, 0.5), color: BADGE_GOLD, size: 22, padX: 22, height: 52 })
     bx += w + 12
-    if (bx > STORY_W - 400) break
   }
+}
 
+/** Eyebrow, headline, member line and optional caption. Returns the next free y. */
+function drawHeadlineBlock(ctx: Ctx, data: PassportCardData, o: PassportRenderOptions, t: Palette, w: number, size: number, top: number, maxLines: number) {
+  ctx.textBaseline = 'alphabetic'
+  font(ctx, 26, 700, 5)
+  ctx.fillStyle = t.accent
+  ctx.fillText(`MY GARUDA PASSPORT · ${new Date().getFullYear()}`, 80, top)
+  font(ctx, size, 800, -2)
+  ctx.fillStyle = '#fff'
+  const headline = o.headline?.trim() || `${data.stats.destinations} destinations, ${formatNumber(data.stats.distanceKm)} km flown.`
+  const lines = wrap(ctx, headline, w - 160).slice(0, maxLines)
+  const lh = size * 1.13
+  lines.forEach((l, i) => ctx.fillText(l, 80, top + 108 + i * lh))
+  let y = top + 108 + (lines.length - 1) * lh + 60
+
+  font(ctx, 40, 800)
+  ctx.fillStyle = '#fff'
+  ctx.fillText(data.name, 80, y + 36)
+  const nameW = ctx.measureText(data.name).width
+  pill(ctx, 80 + nameW + 22, y - 2, `GarudaMiles ${data.tier}`, { fill: 'rgba(255,255,255,0.1)', stroke: 'rgba(255,255,255,0.22)', color: '#fff', size: 22, padX: 22, height: 50 })
+  ctx.textBaseline = 'alphabetic'
+  font(ctx, 24, 600, 1)
+  ctx.fillStyle = 'rgba(255,255,255,0.65)'
+  ctx.fillText([o.showMemberId ? data.milesId : null, `Member since ${data.memberSince}`].filter(Boolean).join(' · '), 80, y + 82)
+  y += 100
+
+  if (o.caption?.trim()) {
+    font(ctx, 28, 600, 0)
+    ctx.fillStyle = t.accent
+    const cap = wrap(ctx, `“${o.caption.trim()}”`, w - 160).slice(0, 2)
+    cap.forEach((l, i) => ctx.fillText(l, 80, y + 22 + i * 38))
+    y += 40 + (cap.length - 1) * 38
+  }
+  return y + 30
+}
+
+/** Instagram story (1080 × 1920). */
+async function renderStory(data: PassportCardData, o: PassportRenderOptions, t: Palette): Promise<Blob> {
+  const { canvas, ctx } = makeCanvas()
+  background(ctx, t)
+  await header(ctx, 'Garuda Flight Passport', t)
+  // Without the map there is a lot more room: scale the remaining sections up so the card still feels full.
+  const roomy = !o.showMap
+  let y = drawHeadlineBlock(ctx, data, o, t, STORY_W, roomy ? 100 : 92, roomy ? 320 : 292, 3)
+  if (roomy) y += 30
+
+  if (o.showStats) {
+    const th = roomy ? 200 : 150
+    drawStatTiles(ctx, y, data, STORY_W, th)
+    y += th + (roomy ? 70 : 40)
+  }
+  if (o.showMap) {
+    const mapH = o.showStamps && o.showBadges ? 500 : 620
+    drawRouteMap(ctx, 80, y, STORY_W - 160, mapH, data, t)
+    y += mapH + 40
+  }
+  const mascotSize = roomy ? 420 : 360
+  let anchorY: number | null = null
+  if (o.showStamps) {
+    anchorY = y
+    y = drawStampsRow(ctx, y, data, o, t, roomy ? 176 : 138)
+    if (roomy) y += 30
+  }
+  if (o.showBadges && data.badges.length) {
+    anchorY = anchorY ?? y - 20
+    sectionLabel(ctx, 'BADGES EARNED', 80, y)
+    drawBadgePills(ctx, 80, y + 22, data.badges, o.mascot === 'none' ? STORY_W - 80 : STORY_W - 80 - mascotSize + 40)
+    y += 100
+  }
+  // Mascot sits beside the stamps/badges block, never over the footer.
+  const mascotTop = Math.min(anchorY ?? y, STORY_H - 150 - mascotSize)
+  await drawMascot(ctx, o.mascot, STORY_W - 80 - mascotSize + 30, mascotTop, mascotSize)
+  // Fill leftover space with journey highlights (only when the mascot isn't occupying it).
+  const mascotBottom = o.mascot === 'none' ? 0 : mascotTop + mascotSize + 20
+  const hy = Math.max(y + 20, mascotBottom)
+  const rows = Math.min(2, Math.floor((STORY_H - 150 - hy - 52) / 146))
+  if (data.highlights?.length && rows >= 1) drawHighlights(ctx, hy, data.highlights.slice(0, rows * 2), STORY_W, t)
   footer(ctx, 'flygaruda.app  ·  #ActivateTheJourney', 'Garuda Indonesia')
   return toBlob(canvas)
+}
+
+/** Square feed post (1080 × 1080) — a tighter composition of the same passport. */
+async function renderSquare(data: PassportCardData, o: PassportRenderOptions, t: Palette): Promise<Blob> {
+  const { canvas, ctx } = makeCanvas(SQUARE_W, SQUARE_H)
+  background(ctx, t, SQUARE_W, SQUARE_H)
+  await header(ctx, 'Garuda Flight Passport', t, SQUARE_W)
+  let y = drawHeadlineBlock(ctx, data, o, t, SQUARE_W, 72, 250, 2)
+  if (o.showStats) {
+    drawStatTiles(ctx, y, data, SQUARE_W, 130)
+    y += 160
+  }
+  const mascotSize = 300
+  let anchorY: number | null = null
+  if (o.showStamps) {
+    anchorY = y
+    y = drawStampsRow(ctx, y, data, o, t, 128)
+  }
+  if (o.showBadges && data.badges.length && y < SQUARE_H - 200) {
+    anchorY = anchorY ?? y - 20
+    sectionLabel(ctx, 'BADGES EARNED', 80, y)
+    drawBadgePills(ctx, 80, y + 22, data.badges, o.mascot === 'none' ? SQUARE_W - 80 : SQUARE_W - 80 - mascotSize + 30)
+  }
+  await drawMascot(ctx, o.mascot, SQUARE_W - 80 - mascotSize + 30, Math.min(anchorY ?? y, SQUARE_H - 140 - mascotSize), mascotSize)
+  footer(ctx, 'flygaruda.app  ·  #ActivateTheJourney', 'Garuda Indonesia', SQUARE_W, SQUARE_H)
+  return toBlob(canvas)
+}
+
+export async function renderPassportStory(data: PassportCardData, options: PassportRenderOptions): Promise<Blob> {
+  await ensureFonts()
+  const t = paletteFor(options.theme, options.custom)
+  return options.format === 'square' ? renderSquare(data, options, t) : renderStory(data, options, t)
 }
 
 /* ------------------------------------------------------------------ */
@@ -464,8 +631,8 @@ function drawBarcode(ctx: Ctx, x: number, y: number, w: number, h: number, seed:
 export async function renderBoardingPassStory(trip: Trip, passengerName: string): Promise<Blob> {
   await ensureFonts()
   const { canvas, ctx } = makeCanvas()
-  background(ctx, 'navy')
-  await header(ctx, 'Digital boarding pass', 'navy')
+  background(ctx, PRESETS.navy)
+  await header(ctx, 'Digital boarding pass', PRESETS.navy)
 
   const dep = trip.disruption ? trip.disruption.newDepartTime : trip.departTime
   const arr = trip.disruption ? trip.disruption.newArriveTime : trip.arriveTime
@@ -473,7 +640,7 @@ export async function renderBoardingPassStory(trip: Trip, passengerName: string)
 
   ctx.textBaseline = 'alphabetic'
   font(ctx, 26, 700, 5)
-  ctx.fillStyle = THEMES.navy.accent
+  ctx.fillStyle = PRESETS.navy.accent
   ctx.fillText('READY TO FLY', 80, 292)
   font(ctx, 72, 800, -1.5)
   ctx.fillStyle = '#fff'
@@ -537,7 +704,7 @@ export async function renderBoardingPassStory(trip: Trip, passengerName: string)
   ctx.stroke()
   ctx.beginPath()
   ctx.arc(cx + cw / 2, cy + 222, 9, 0, Math.PI * 2)
-  ctx.fillStyle = THEMES.navy.accent
+  ctx.fillStyle = PRESETS.navy.accent
   ctx.fill()
   ctx.fillStyle = 'rgba(255,255,255,0.7)'
   ctx.fillText('Direct', cx + cw / 2, cy + 262)
@@ -619,8 +786,8 @@ export async function renderBoardingPassStory(trip: Trip, passengerName: string)
 export async function renderMembershipCard(data: { name: string; tier: string; milesId: string; memberSince: string; balance: number }): Promise<Blob> {
   await ensureFonts()
   const { canvas, ctx } = makeCanvas()
-  background(ctx, 'navy')
-  await header(ctx, 'GarudaMiles', 'navy')
+  background(ctx, PRESETS.navy)
+  await header(ctx, 'GarudaMiles', PRESETS.navy)
   const cx = 80
   const cy = 560
   const cw = STORY_W - 160

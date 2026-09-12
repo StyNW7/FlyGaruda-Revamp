@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { Check, MessageCircle, Phone, Video, MoreVertical } from 'lucide-react'
 import { BottomSheet } from '../common/Overlays'
 import { Button } from '../common/Button'
@@ -6,7 +7,7 @@ import { useApp } from '../../store/AppContext'
 import type { Trip } from '../../types'
 import { cityOf } from '../../data/airports'
 
-function Bubble({ children, time, actions }: { children: React.ReactNode; time: string; actions?: string[] }) {
+function Bubble({ children, time, actions, onAction }: { children: React.ReactNode; time: string; actions?: string[]; onAction?: (label: string) => void }) {
   return (
     <div className="max-w-[86%]">
       <div className="bg-white rounded-2xl rounded-tl-md shadow-sm px-3.5 py-2.5 text-[13px] text-[#111B21] leading-snug">
@@ -16,9 +17,9 @@ function Bubble({ children, time, actions }: { children: React.ReactNode; time: 
       {actions && (
         <div className="mt-1 space-y-1">
           {actions.map((a) => (
-            <div key={a} className="bg-white rounded-xl shadow-sm py-2 text-center text-[13px] font-semibold text-[#027EB5]">
+            <button key={a} type="button" onClick={() => onAction?.(a)} className="w-full bg-white rounded-xl shadow-sm py-2 text-center text-[13px] font-semibold text-[#027EB5] active:bg-[#F0F2F5]">
               {a}
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -29,7 +30,20 @@ function Bubble({ children, time, actions }: { children: React.ReactNode; time: 
 /** Visual-only mock of proactive WhatsApp journey updates. No real WhatsApp APIs are used. */
 export function WhatsAppPreview({ open, onClose, trip }: { open: boolean; onClose: () => void; trip: Trip }) {
   const { state, dispatch } = useApp()
+  const navigate = useNavigate()
   const dest = trip.destination === 'DPS' ? 'Bali' : cityOf(trip.destination)
+  /** Bubble buttons deep-link into the app, exactly as the real WhatsApp message would. */
+  const act = (label: string) => {
+    const to: Record<string, string> = {
+      'Check In': `/checkin/${trip.id}`,
+      'View Trip': `/trips/${trip.id}`,
+      'Open Boarding Pass': `/boarding-pass/${trip.id}`,
+      'Gate Directions': `/boarding-pass/${trip.id}`,
+      'View Updated Journey': `/flight-update/${trip.id}`,
+    }
+    onClose()
+    navigate(to[label] ?? `/trips/${trip.id}`)
+  }
   return (
     <BottomSheet
       open={open}
@@ -73,7 +87,7 @@ export function WhatsAppPreview({ open, onClose, trip }: { open: boolean; onClos
           <div className="flex justify-center">
             <span className="text-[10.5px] bg-[#D4E9F7]/90 text-[#3B4A54] rounded-md px-2 py-1">Yesterday</span>
           </div>
-          <Bubble time="18:02" actions={['Check In', 'View Trip']}>
+          <Bubble time="18:02" actions={['Check In', 'View Trip']} onAction={act}>
             Hi {trip.passengerName.split(' ')[0]}, your flight <strong>{trip.flightNumber.replace(' ', '')}</strong> to {dest} departs tomorrow at{' '}
             <strong>{trip.departTime}</strong> from {trip.terminal}.
             <br />
@@ -86,11 +100,11 @@ export function WhatsAppPreview({ open, onClose, trip }: { open: boolean; onClos
           <Bubble time="06:10">
             Recommended arrival at {trip.terminal}: <strong>06:15</strong>. Traffic is currently moderate — about 52 minutes from your location.
           </Bubble>
-          <Bubble time="07:25" actions={['Open Boarding Pass', 'Gate Directions']}>
+          <Bubble time="07:25" actions={['Open Boarding Pass', 'Gate Directions']} onAction={act}>
             Boarding begins in <strong>25 minutes</strong> at <strong>Gate {trip.gate}</strong>. It is about an 8-minute walk from security.
           </Bubble>
           {trip.disruption && (
-            <Bubble time="07:32" actions={['View Updated Journey']}>
+            <Bubble time="07:32" actions={['View Updated Journey']} onAction={act}>
               Flight update: {trip.flightNumber.replace(' ', '')} is delayed by <strong>{trip.disruption.delayMin} minutes</strong>. New departure{' '}
               <strong>{trip.disruption.newDepartTime}</strong>, boarding <strong>{trip.disruption.newBoardingTime}</strong>. Your trip has been updated automatically.
             </Bubble>

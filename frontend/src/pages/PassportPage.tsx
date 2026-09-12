@@ -8,11 +8,12 @@ import { BottomSheet } from '../components/common/Overlays'
 import { ProgressBar } from '../components/common/States'
 import { ShareImageSheet } from '../components/common/ShareImageSheet'
 import { RouteMap } from '../components/miles/RouteMap'
-import { useApp, type ShareTheme } from '../store/AppContext'
+import { StoryStudio } from '../components/miles/StoryStudio'
+import { useApp } from '../store/AppContext'
 import { BADGES, PASSPORT_STAMPS } from '../data/miles'
 import { SEED_TRIPS } from '../data/trips'
 import { getAirport } from '../data/airports'
-import { renderPassportStory, SHARE_THEMES } from '../utils/storyCard'
+import { renderPassportStory } from '../utils/storyCard'
 import { distanceKm } from '../utils/geo'
 import { formatNumber, formatShortDate } from '../utils/format'
 import type { AirportCode, Badge, PassportStamp, Trip } from '../types'
@@ -39,26 +40,6 @@ function StampMark({ stamp, index, onClick }: { stamp: PassportStamp; index: num
       <p className={cn('text-[12px] font-bold mt-2', stamp.collected ? 'text-ink' : 'text-ink-muted')}>{stamp.city}</p>
       <p className="text-[10.5px] text-ink-muted">{stamp.collected ? `${stamp.visits} visit${stamp.visits > 1 ? 's' : ''}` : 'Not yet visited'}</p>
     </button>
-  )
-}
-
-function ThemePicker({ value, onChange }: { value: ShareTheme; onChange: (t: ShareTheme) => void }) {
-  return (
-    <div className="flex items-center justify-center gap-2" role="radiogroup" aria-label="Story theme">
-      {SHARE_THEMES.map((t) => (
-        <button
-          key={t.id}
-          type="button"
-          role="radio"
-          aria-checked={value === t.id}
-          onClick={() => onChange(t.id)}
-          className={cn('inline-flex items-center gap-2 rounded-full border pl-1.5 pr-3 h-9 text-[12px] font-semibold transition-colors', value === t.id ? 'border-brand-navy bg-white text-ink' : 'border-surface-line bg-white text-ink-muted')}
-        >
-          <span className="h-6 w-6 rounded-full ring-2 ring-white shadow-card" style={{ background: `linear-gradient(135deg, ${t.stops[0]}, ${t.stops[2]})` }} />
-          {t.label.split(' ')[1]}
-        </button>
-      ))}
-    </div>
   )
 }
 
@@ -338,27 +319,40 @@ export function PassportPage() {
         open={share}
         onClose={() => setShare(false)}
         title="Share your journey"
-        subtitle="Instagram-story card of your Garuda Passport"
-        filename={`garuda-passport-${user.firstName.toLowerCase()}-${new Date().getFullYear()}.png`}
+        subtitle={state.share.format === 'square' ? 'Feed-post card of your Garuda Passport · customise below' : 'Story card of your Garuda Passport · customise below'}
+        filename={`garuda-passport-${user.firstName.toLowerCase()}-${state.share.format}-${new Date().getFullYear()}.png`}
         shareTitle="My Garuda Passport"
         shareText={`${stats.destinations} destinations and ${formatNumber(stats.distanceKm)} km flown with Garuda Indonesia. #ActivateTheJourney`}
-        controls={<ThemePicker value={state.shareTheme} onChange={(t) => dispatch({ type: 'SET_SHARE_THEME', value: t })} />}
-        render={() =>
-          renderPassportStory({
-            name: user.name,
-            tier: miles.tier.name,
-            milesId: user.milesId,
-            memberSince: user.memberSince,
-            stats,
-            stamps: collected.filter((s) => s.code !== HOME).map((s) => ({ code: s.code, city: s.city, firstVisit: s.firstVisit })),
-            routes,
-            visited: visitedCodes,
-            badges: earnedBadges.map((b) => b.name),
-            theme: state.shareTheme,
-            headline: shareHeadline,
-          })
+        aspect={state.share.format}
+        debounceMs={350}
+        controls={
+          <StoryStudio
+            headlinePresets={[
+              `${miles.flightsThisYear} flights in ${new Date().getFullYear()} so far.`,
+              `${earnedBadges.length} badges, ${collected.length} stamps, one passport.`,
+              `${formatNumber(stats.distanceKm)} km closer to Platinum.`,
+              locked[0] ? `Next stop: ${locked[0].city}.` : 'Where to next?',
+            ]}
+          />
         }
-        deps={[state.shareTheme, shareHeadline, stats.flights, stats.destinations]}
+        render={() =>
+          renderPassportStory(
+            {
+              name: user.name,
+              tier: miles.tier.name,
+              milesId: user.milesId,
+              memberSince: user.memberSince,
+              stats,
+              stamps: collected.filter((s) => s.code !== HOME).map((s) => ({ code: s.code, city: s.city, firstVisit: s.firstVisit })),
+              routes,
+              visited: visitedCodes,
+              badges: earnedBadges.map((b) => b.name),
+              highlights: highlights.map((h) => ({ label: h.label, value: h.value, sub: h.sub })),
+            },
+            { ...state.share, headline: shareHeadline ?? state.share.headline },
+          )
+        }
+        deps={[state.share, shareHeadline, stats.flights, stats.destinations]}
       />
     </div>
   )

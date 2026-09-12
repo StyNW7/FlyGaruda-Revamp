@@ -15,7 +15,7 @@ export interface FeatureContent {
   highlights?: { title: string; description: string }[]
   sections?: { title: string; items: string[] }[]
   faqs?: { q: string; a: string }[]
-  cta?: { label: string; to?: string; message?: string }
+  cta?: { label: string; to: string }
   note?: string
   /** Bookable partner catalogue — purchases are stored in the account. */
   catalog?: { kind: PurchaseKind; unit?: string; items: CatalogItem[] }
@@ -50,7 +50,6 @@ export const FEATURE_CONTENT: Record<string, FeatureContent> = {
       { title: 'Domestic flights', items: ['Valid KTP, passport or driving licence', 'Children: birth certificate or family card', 'Boarding pass on your phone or printed'] },
       { title: 'International flights', items: ['Passport valid at least 6 months from arrival', 'Visa or visa-on-arrival where required', 'Return or onward ticket may be requested'] },
     ],
-    cta: { label: 'Check requirements for my trip', message: 'Your next trip Jakarta → Denpasar is domestic: KTP or passport is sufficient.' },
   },
   'travel-advisories': {
     intro: 'Operational and destination updates that may affect your journey.',
@@ -76,7 +75,6 @@ export const FEATURE_CONTENT: Record<string, FeatureContent> = {
       { title: 'GA 860 · Jakarta → Singapore', description: 'Bids open · minimum bid Rp 2,400,000' },
     ],
     sections: [{ title: 'Business Class includes', items: ['Lie-flat or premium recliner seat', 'Priority check-in, boarding and baggage', 'Garuda Lounge access', 'Fine dining menu with Indonesian specialities'] }],
-    cta: { label: 'Place a bid on GA 412', message: 'Bid of Rp 1,250,000 placed for GA 412. We will notify you 48 hours before departure.' },
   },
   'add-on': {
     intro: 'Personalise your journey with extra services, available up to 6 hours before departure.',
@@ -94,7 +92,6 @@ export const FEATURE_CONTENT: Record<string, FeatureContent> = {
       { title: 'Complimentary access', items: ['Business and First Class passengers', 'GarudaMiles Gold and Platinum members', 'SkyTeam Elite Plus members'] },
       { title: 'Purchase access', items: ['Economy passengers · Rp 250,000', 'GarudaMiles Silver · Rp 175,000'] },
     ],
-    cta: { label: 'Add lounge access to GA 412', message: 'Lounge access added to GA 412 · Rp 175,000 (Silver rate)' },
   },
   'in-flight-services': {
     intro: 'Entertainment, meals and connectivity — all part of the full-service Garuda experience.',
@@ -113,7 +110,6 @@ export const FEATURE_CONTENT: Record<string, FeatureContent> = {
   charter: {
     intro: 'Private and group charter flights for corporate travel, sports teams, pilgrimages and special events.',
     sections: [{ title: 'Charter options', items: ['Boeing 737-800 · up to 162 passengers', 'Airbus A330-300 · up to 360 passengers', 'Cargo charter available'] }],
-    cta: { label: 'Request a charter quote', message: 'Charter request submitted. Our team replies within 2 working days.' },
   },
   kirimaja: {
     intro: 'KirimAja — send parcels and cargo across Indonesia with Garuda’s network, door to door.',
@@ -121,7 +117,6 @@ export const FEATURE_CONTENT: Record<string, FeatureContent> = {
       { title: 'Same-day', description: 'Jakarta → Denpasar from Rp 45,000 per kg' },
       { title: 'Next-day', description: 'Nationwide from Rp 28,000 per kg' },
     ],
-    cta: { label: 'Track a shipment', message: 'Enter your KirimAja airwaybill number to track a shipment.' },
   },
   'carbon-offset': {
     intro: 'Offset the estimated emissions of your flight by supporting verified reforestation projects in Indonesia.',
@@ -130,7 +125,6 @@ export const FEATURE_CONTENT: Record<string, FeatureContent> = {
       { title: 'GA 860 · Jakarta → Singapore', description: 'Estimated 0.14 t CO₂ · offset for Rp 21,000' },
     ],
     sections: [{ title: 'Projects supported', items: ['Mangrove restoration · East Kalimantan', 'Community forestry · Central Sulawesi'] }],
-    cta: { label: 'Offset my next flight', message: 'Thank you. 0.12 t CO₂ offset for GA 412 · Rp 18,000' },
   },
   garudashop: {
     intro: 'Garuda Indonesia merchandise and pre-ordered duty-free delivered to your seat.',
@@ -236,17 +230,14 @@ export const FEATURE_CONTENT: Record<string, FeatureContent> = {
       { title: 'Email', description: 'customer@garuda-indonesia.com' },
       { title: 'City offices', description: 'Jakarta, Surabaya, Denpasar, Makassar, Medan' },
     ],
-    cta: { label: 'Chat on WhatsApp', message: 'WhatsApp chat with Garuda Indonesia opens in the live app' },
   },
   feedback: {
     intro: 'Your feedback shapes the Garuda experience. Rate your last journey or tell us what could be better.',
     highlights: [{ title: 'GA 418 · Denpasar → Jakarta', description: '18 Aug 2026 · How was your flight?' }],
-    cta: { label: 'Send feedback', message: 'Thank you — your feedback has been sent to the Garuda team' },
   },
   'lost-and-found': {
     intro: 'Report an item left on board or at the airport. Most items are traced within 48 hours.',
     sections: [{ title: 'What we need', items: ['Flight number and date', 'Seat number', 'Description of the item'] }],
-    cta: { label: 'Report a lost item', message: 'Report submitted · reference LF-2026-04471' },
   },
   'refund-request': {
     intro: 'Request and track refunds for cancelled or changed bookings.',
@@ -262,7 +253,6 @@ export const FEATURE_CONTENT: Record<string, FeatureContent> = {
       { title: 'Dewi Anggraini · Family', description: 'GA-30112788 · Passport X•••••441' },
       { title: 'Bima Wijaya · Family', description: 'Passport X•••••209' },
     ],
-    cta: { label: 'Add a traveller', message: 'New traveller form opens in the live app' },
   },
   'payment-methods': {
     intro: 'Cards, wallet and bank accounts saved securely for one-tap payment.',
@@ -271,7 +261,6 @@ export const FEATURE_CONTENT: Record<string, FeatureContent> = {
       { title: 'Travel Wallet', description: 'Balance Rp 2,150,000' },
       { title: 'BCA virtual account', description: 'Bank transfer · instant confirmation' },
     ],
-    cta: { label: 'Add a payment method', message: 'Card form opens in the live app' },
   },
   wishlist: {
     intro: 'Destinations you have saved. We will let you know when fares drop.',
