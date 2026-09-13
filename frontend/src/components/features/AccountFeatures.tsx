@@ -143,7 +143,7 @@ export function PaymentMethods() {
       <BottomSheet open={add} onClose={() => setAdd(false)} title="Add a card" subtitle="Stored securely · demo only, no real card is charged" footer={<Button full disabled={!valid} onClick={save}>Save card</Button>}>
         <div className="space-y-3.5 pt-1">
           <Input label="Card number" inputMode="numeric" value={card.number} onChange={(e) => setCard((c) => ({ ...c, number: e.target.value.replace(/\D/g, '').slice(0, 16).replace(/(\d{4})(?=\d)/g, '$1 ') }))} placeholder="4242 4242 4242 4242" className="font-mono" hint={digits.length > 0 ? `${brand} · ${digits.length}/16 digits` : undefined} />
-          <Input label="Name on card" value={card.name} onChange={(e) => setCard((c) => ({ ...c, name: e.target.value.toUpperCase() }))} placeholder="RAKA WIJAYA" />
+          <Input label="Name on card" value={card.name} onChange={(e) => setCard((c) => ({ ...c, name: e.target.value.toUpperCase() }))} placeholder="KEVIN WIJAYA" />
           <div className="grid grid-cols-2 gap-3">
             <Input label="Expiry" value={card.expiry} onChange={(e) => setCard((c) => ({ ...c, expiry: e.target.value.replace(/[^\d]/g, '').slice(0, 4).replace(/(\d{2})(?=\d)/, '$1/') }))} placeholder="MM/YY" className="font-mono" inputMode="numeric" />
             <Input label="CVV" type="password" value={card.cvv} onChange={(e) => setCard((c) => ({ ...c, cvv: e.target.value.replace(/\D/g, '').slice(0, 3) }))} placeholder="•••" className="font-mono" inputMode="numeric" />

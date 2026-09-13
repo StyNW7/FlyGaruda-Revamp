@@ -42,7 +42,7 @@ export function nextTierFor(tier: TierName): Tier | undefined {
   return TIERS[i + 1]
 }
 
-/** Seeded starting point for Raka's account. Everything else is derived from state. */
+/** Seeded starting point for Kevin's account. Everything else is derived from state. */
 export const MILES_SEED = {
   balance: 12450,
   tierMiles: 18400,

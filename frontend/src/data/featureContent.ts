@@ -249,7 +249,7 @@ export const FEATURE_CONTENT: Record<string, FeatureContent> = {
   'saved-passengers': {
     intro: 'Travellers you fly with, ready for faster checkout.',
     highlights: [
-      { title: 'Raka Wijaya · Myself', description: 'GA-27845193 · KTP verified' },
+      { title: 'Kevin Wijaya · Myself', description: 'GA-27845193 · KTP verified' },
       { title: 'Dewi Anggraini · Family', description: 'GA-30112788 · Passport X•••••441' },
       { title: 'Bima Wijaya · Family', description: 'Passport X•••••209' },
     ],

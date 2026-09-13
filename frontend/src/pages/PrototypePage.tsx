@@ -91,7 +91,7 @@ export function PrototypePage() {
         {!isMember && (
           <section className="card p-4">
             <p className="text-[14px] font-bold text-ink">Signed in as guest</p>
-            <p className="t-caption mt-0.5">Sign in with the demo account to load Raka’s trips and miles.</p>
+            <p className="t-caption mt-0.5">Sign in with the demo account to load Kevin's trips and miles.</p>
             <Button className="mt-3" size="sm" leftIcon={<LogIn className="h-4 w-4" />} onClick={() => navigate('/login')}>
               Sign in
             </Button>
@@ -105,7 +105,7 @@ export function PrototypePage() {
                 <Route className="h-4 w-4 text-brand-turquoise" />
                 <p className="text-[14px] font-bold text-ink">Journey stage · GA 412</p>
               </div>
-              <p className="t-caption mb-3">Move Raka along his journey to preview Home, Trip and Companion at each step.</p>
+              <p className="t-caption mb-3">Move Kevin along his journey to preview Home, Trip and Companion at each step.</p>
               <div className="grid grid-cols-3 gap-2">
                 {STAGES.map((s) => (
                   <button

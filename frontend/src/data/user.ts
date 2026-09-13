@@ -6,10 +6,10 @@ export const DEMO_CREDENTIALS = {
 }
 
 export const USER: User = {
-  name: 'Raka Wijaya',
-  firstName: 'Raka',
+  name: 'Kevin Wijaya',
+  firstName: 'Kevin',
   initials: 'RW',
-  email: 'raka.wijaya@example.com',
+  email: 'kevin.wijaya@example.com',
   phone: '+62 812 3456 7890',
   milesId: 'GA-27845193',
   tier: 'Silver',
@@ -21,7 +21,7 @@ export const USER: User = {
 }
 
 export const SAVED_PASSENGERS: SavedPassenger[] = [
-  { id: 'p1', name: 'Raka Wijaya', relation: 'Myself', dob: '14 Mar 1998', milesId: 'GA-27845193', passport: 'X•••••812' },
+  { id: 'p1', name: 'Kevin Wijaya', relation: 'Myself', dob: '14 Mar 1998', milesId: 'GA-27845193', passport: 'X•••••812' },
   { id: 'p2', name: 'Dewi Anggraini', relation: 'Family', dob: '02 Jul 1999', milesId: 'GA-30112788', passport: 'X•••••441' },
   { id: 'p3', name: 'Bima Wijaya', relation: 'Family', dob: '27 Nov 1965', milesId: undefined, passport: 'X•••••209' },
 ]
@@ -72,7 +72,7 @@ export const RETRIEVABLE_BOOKINGS: { code: string; lastName: string; trip: Trip 
       category: 'upcoming',
       checkedIn: false,
       checkInOpen: false,
-      passengerName: 'Raka Wijaya',
+      passengerName: 'Kevin Wijaya',
       baggageChecked: '20 kg',
       baggageCabin: '7 kg',
       meal: 'Standard meal',
